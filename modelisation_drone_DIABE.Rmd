@@ -60,13 +60,12 @@ Ces statistiques constituent les 'variables drones' :
 
 ## Estimation hauteur arbre 
 
-Un premier modèle de régression linéaire est calibré entre la hauteur drone (H_drone) et la hauteur réelle de l'arbre (H_arbre). 
+Deux modèles de régression linéaire sont calibrés entre la hauteur drone (H_drone) et la hauteur réelle de l'arbre (H_arbre) et entre H_drone et CBH
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 # importation package et donnees
-
 
 suppressPackageStartupMessages(library(plotly))
 suppressPackageStartupMessages(library(tidyverse))
@@ -82,9 +81,18 @@ suppressPackageStartupMessages(library(lmtest))
 
 
 # importation des données biomasses destructives des 40 arbres avec coordonnees GPS + toutes les donénes (biomasse, volume)
-data_drone = read.csv("biom_destructive_gps_all_variable_20260303.csv",dec = ".") 
+data_drone = read.csv("data/data_uav_calibration_tree_20260305.csv",dec = ".") 
 
-data_drone = data_drone %>% mutate(DSM_area = X_count*1.74^2,
+# importation donnees biomasse destructives
+all_biomass <- read.csv("data/data_biomass_destructive_20260305.csv")
+
+data_drone = data_drone %>% left_join(all_biomass)
+
+# computing total biomass, CBHH2 and UAV variables
+data_drone = data_drone %>% mutate(dry_biom_tot_kg = dry_allF_tot_kg+dry_Brviv_tot_kg+dry_tronc_tot_kg,
+                                   CBHH2 = CBH_m*(HTOT_m)^2,
+                                   classe = as.character(classe),
+                                   DSM_area = X_count*1.74^2,
                                    DSM_volume = X_sum*1.74^2,
                                    X_volume_area = DSM_area*X_max,
                                    cyl_volume = area*X_max,
@@ -95,21 +103,27 @@ data_drone = data_drone %>% mutate(DSM_area = X_count*1.74^2,
 ```{r model_h echo=FALSE, message=FALSE, warning=FALSE}
 # Modélisation de la hauteur des arbres
 
-lm_h = lm(hauteur.m~X_max,data_drone)
+lm_h = lm(HTOT_m~X_max,data_drone)
 summary(lm_h)
 
 hist(lm_h$residuals)
 
+
+lm_cbh = lm(CBH_m~X_max,data_drone)
+summary(lm_cbh)
+
+hist(lm_cbh$residuals)
+
 # D'autres modèles possibles : 
-# lm_h_vol = lm(hauteur.m~X_max + vol_drone,data_drone)
+# lm_h_vol = lm(HTOT_m~X_max + flight_ID,data_drone)
 # anova(lm_h_vol)
 # pas d'effet du vol de drone sur la relation entre les deux hauteurs
 
-# lm_h_fert = lm(hauteur.m~X_max + fertilizat,data_drone)
+# lm_h_fert = lm(HTOT_m~X_max + ferti,data_drone)
 # anova(lm_h_fert)
 # pas d'effet de la fertilisation sur la relation entre les deux hauteurs
 
-# lm_h_age = lm(hauteur.m~X_max + age,data_drone)
+# lm_h_age = lm(HTOT_m~X_max + age,data_drone)
 # anova(lm_h_age)
 # pas d'effet de l'age sur la relation entre les deux hauteurs
 
@@ -120,15 +134,28 @@ hist(lm_h$residuals)
 
 ```{r fig1, echo=FALSE, message=FALSE, warning=FALSE}
 
-ggplot(data_drone,aes(X_max,hauteur.m))+
-  geom_point(aes(color = vol_drone))+
+ggplot(data_drone,aes(X_max,HTOT_m))+
+  geom_point(aes(color = flight_ID))+
   geom_smooth(method = "lm",se =F,color = "black")+
   scale_color_manual(values = c("V1" = '#ff00ff','V3' = '#3399ff')) +
-  #geom_text(x = 9, y = max(data_drone$hauteur.m), label = lm_eqn(data_drone), parse = TRUE, hjust = 1, vjust = 1)+
+  #geom_text(x = 9, y = max(data_drone$HTOT_m), label = lm_eqn(data_drone), parse = TRUE, hjust = 1, vjust = 1)+
   theme_classic()+
   theme(plot.caption = element_text(hjust = 0, vjust = 1, size = 12))+
   labs(x = "Hauteur drone (m)",y = "Hauteur arbre (m)")+
   gg_figure_caption(caption = "Estimation hauteur des arbres avec la hauteur mesurée par drone", caption.width = 98)
+
+# ggplotly(g1, tooltip = "text")
+
+
+ggplot(data_drone,aes(X_max,CBH_m))+
+  geom_point(aes(color = flight_ID))+
+  geom_smooth(method = "lm",se =F,color = "black")+
+  scale_color_manual(values = c("V1" = '#ff00ff','V3' = '#3399ff')) +
+  #geom_text(x = 9, y = max(data_drone$HTOT_m), label = lm_eqn(data_drone), parse = TRUE, hjust = 1, vjust = 1)+
+  theme_classic()+
+  theme(plot.caption = element_text(hjust = 0, vjust = 1, size = 12))+
+  labs(x = "Hauteur drone (m)",y = "CBH arbre (m)")+
+  gg_figure_caption(caption = "Estimation CBH (en m) des arbres avec la hauteur mesurée par drone", caption.width = 98)
 
 # ggplotly(g1, tooltip = "text")
   
@@ -181,11 +208,8 @@ Avant modélisation, les certaines variables drones sont réduites (par 10^5) ca
 ```{r echo=FALSE}
 
 # retrait d'arbres outliers (17_6NF, ligne 10 et 17_4F, ligne 20)
-data_drone_wo = data_drone %>% filter(!code_b_des %in% c("17_4F","17_6NF"))
-data_drone_wo = data_drone_wo %>% mutate(DSM_area = DSM_area,
-                                         DSM_volume = DSM_volume ,
-                                         X_volume_area = X_volume_area,
-                                         cyl_lat_area = cyl_lat_area)
+data_drone_wo = data_drone %>% filter(!(year == "2017" & ferti =="F" & classe=="4"))
+data_drone_wo = data_drone_wo %>% filter(!(year == "2017" & ferti =="NF" & classe=="6"))
 
   
 ```
@@ -559,66 +583,89 @@ kable(df.results.tronc,caption = table.caption("Performances des modèles pour l
 
 lm.tot.out.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_drone)
 lm.tot.out.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_drone)
-lm.tot.out.3 <- lm(dry_biom_tot_kg ~ X_volume, data=data_drone)
+lm.tot.out.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_drone)
 lm.tot.out.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_drone)
+lm.tot.out.5 <- lm(dry_biom_tot_kg ~ cyl_volume, data=data_drone)
 
-lm.tot.out.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_drone)
-lm.tot.out.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_drone)
-lm.tot.out.7 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_drone)
-lm.tot.out.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone)
+lm.tot.out.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_drone)
+lm.tot.out.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_drone)
+lm.tot.out.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_drone)
+lm.tot.out.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone)
+lm.tot.out.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_drone_wo)
 
-list.lm.tot.out <- list(lm.tot.out.1, lm.tot.out.2, lm.tot.out.3, lm.tot.out.4, lm.tot.out.5, lm.tot.out.6, lm.tot.out.7, lm.tot.out.8)
+list.lm.tot.out <- list(lm.tot.out.1, lm.tot.out.2, lm.tot.out.3, lm.tot.out.4, lm.tot.out.5, lm.tot.out.6, lm.tot.out.7, lm.tot.out.8,lm.tot.out.9,lm.tot.out.10)
 
 pred.tot.out.1 <- predict(lm.tot.out.1)
 pred.tot.out.2 <- predict(lm.tot.out.2)
 pred.tot.out.3 <- predict(lm.tot.out.3)
 pred.tot.out.4 <- predict(lm.tot.out.4)
+pred.tot.out.5 <- predict(lm.tot.out.5)
 
-pred.tot.out.5 <- exp(predict(lm.tot.out.5)+mean(lm.tot.out.5$residuals^2)/2)
-pred.tot.out.6 <- exp(predict(lm.tot.out.6)+mean(lm.tot.out.6$residuals^2)/2)
-pred.tot.out.7 <- exp(predict(lm.tot.out.7)+mean(lm.tot.out.7$residuals^2)/2)
-pred.tot.out.8 <- exp(predict(lm.tot.out.8)+mean(lm.tot.out.8$residuals^2)/2)
+pred.tot.out.6 <- exp(predict(lm.tot.out.6)+0.5*summary(lm.tot.6)$sigma^2)
+pred.tot.out.7 <- exp(predict(lm.tot.out.7)+0.5*summary(lm.tot.7)$sigma^2)
+pred.tot.out.8 <- exp(predict(lm.tot.out.8)+0.5*summary(lm.tot.8)$sigma^2)
+pred.tot.out.9 <- exp(predict(lm.tot.out.9)+0.5*summary(lm.tot.9)$sigma^2)
+pred.tot.out.10 <- exp(predict(lm.tot.out.10)+0.5*summary(lm.tot.10)$sigma^2)
 
-list.pred.tot.out <- list(pred.tot.out.1, pred.tot.out.2, pred.tot.out.3, pred.tot.out.4, pred.tot.out.5, pred.tot.out.6, pred.tot.out.7, pred.tot.out.8)
+list.pred.tot.out <- list(pred.tot.out.1, pred.tot.out.2, pred.tot.out.3, pred.tot.out.4, pred.tot.out.5, pred.tot.out.6, pred.tot.out.7, pred.tot.out.8,pred.tot.out.9,pred.tot.out.10)
 
 nb_model <- length(list.pred.tot.out)
 nb_values <- length(list.pred.tot.out[[1]])
 
-
-bias.vec.tot.out <- c()
+bias.abs.vec.tot.out <- c()
+bias.rel.vec.tot.out <- c()
 MAPE.vec.tot.out <- c()
 MAE.vec.tot.out <- c()
 NRMSE.vec.tot.out <- c()
 RMSE.vec.tot.out <- c()
 r2.vec.tot.out <- c()
+AIC.vec.tot.out <- c()
+ks.test.vec.tot.out <- c()
+sw.test.vec.tot.out <- c()
+bp.test.vec.tot.out <- c()
 a.vec.tot.out <- c()
 b.vec.tot.out <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
+cf.vec.tot.out <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
 
 for (i in 1:nb_model){
-  bias.vec.tot.out[i] <- bias(unlist(list.pred.tot.out[i]), data_drone$dry_biom_tot_kg)
-  MAPE.vec.tot.out[i] <- MAPE(unlist(list.pred.tot.out[i]), data_drone$dry_biom_tot_kg)
-  MAE.vec.tot.out[i] <- round(MAE(unlist(list.pred.tot.out[i]), data_drone$dry_biom_tot_kg), 2)
-  RMSE.vec.tot.out[i] <- round(RMSE(unlist(list.pred.tot.out[i]), data_drone$dry_biom_tot_kg), 2)
-  r2.vec.tot.out[i] <- r2(list.lm.tot.out[[i]])
-  NRMSE.vec.tot.out[i] <- round(100*RMSE(unlist(list.pred.tot.out[i]),   data_drone$dry_biom_tot_kg)/mean(data_drone$dry_biom_tot_kg), 2)
-  r2.vec.tot.out[i] <- r2(list.lm.tot.out[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.tot.out[i] <- list.lm.tot.out[[i]]$coefficients[2]
-    b.vec.tot.out[i] <- exp(list.lm.tot.out[[i]]$coefficients[1])
-    
+  bias.abs.vec.tot.out[i] <- round(mean(unlist(list.pred.tot.out[i]) - data_drone$dry_biom_tot_kg),2)
+  bias.rel.vec.tot.out[i] <- round(mean((unlist(list.pred.tot.out[i]) - data_drone$dry_biom_tot_kg) /
+                                        data_drone$dry_biom_tot_kg)*100,2)
+  MAPE.vec.tot.out[i] <- round(mape(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i]))*100,2)
+  MAE.vec.tot.out[i] <- round(mae(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i])), 2)
+  RMSE.vec.tot.out[i] <- round(rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i])), 2)
+  r2.vec.tot.out[i] <- round(summary(list.lm.tot.out[[i]])$adj.r.squared,2)
+  AIC.vec.tot.out[i]<- round(AIC(list.lm.tot.out[[i]]),2)
+  NRMSE.vec.tot.out[i] <- round(100*rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i]))
+                          /mean(data_drone$dry_biom_tot_kg), 2)
+  ks.test.vec.tot.out[i] = round(testUniformity((simulateResiduals(list.lm.tot.out[[i]])),plot =F)$p.value,2)
+  sw.test.vec.tot.out[i] = round(shapiro.test(residuals(list.lm.tot.out[[i]]))$p.value,2)
+  bp.test.vec.tot.out[i] = round(bptest(list.lm.tot.out[[i]])$p.value,2)
+   a.vec.tot.out[i] <- round(list.lm.tot.out[[i]]$coefficients[1],2)
+  b.vec.tot.out[i] <- round(list.lm.tot.out[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.tot.out[i] <- round(exp(list.lm.tot.out[[i]]$coefficients[1]),2)
+    cf.vec.tot.out[i] <- round(exp(0.5*summary(list.lm.tot.out[[i]])$sigma^2),2)
   }
-  else {
-    a.vec.tot.out[i] <- list.lm.tot.out[[i]]$coefficients[2]
-    b.vec.tot.out[i] <- list.lm.tot.out[[i]]$coefficients[1]
-    
-  } 
 }
 
+df.results.tot.out <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.tot.out, "bias_rel" = bias.rel.vec.tot.out, 
+                                    "MAE" = MAE.vec.tot.out, "MAPE" = MAPE.vec.tot.out, 
+                                    "RMSE" = RMSE.vec.tot.out, "NRMSE" = NRMSE.vec.tot.out, 
+                                    "r2" = r2.vec.tot.out,"AIC" = AIC.vec.tot.out,
+                                    "KS" = ks.test.vec.tot.out, "SW" = sw.test.vec.tot.out,
+                                    "BP" = bp.test.vec.tot.out,
+                                    "a" = a.vec.tot.out, "b" = b.vec.tot.out, 
+                                    "CF" = cf.vec.tot.out)
 
-df.results.tot.out <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.tot.out, "MAE" = MAE.vec.tot.out, "RMSE" = RMSE.vec.tot.out, "MAPE" = MAPE.vec.tot.out, "NRMSE" = NRMSE.vec.tot.out, "r2" = r2.vec.tot.out, "a" = a.vec.tot.out, "b" = b.vec.tot.out)
+
+write.csv2(df.results.tot.out,"modele_biomass_totale_avecoutliers.csv")
 
 kable(df.results.tot.out,caption = table.caption("Performances des modèles pour la biomasse totale des arbres (avec outliers)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
@@ -717,7 +764,7 @@ df.results.totale <- data.frame("Model" = 1:nb_model, "Variable" = variables,
                                     "CF" = cf.vec.tot)
 
 
-#write.csv2(df.results.totale,"modele_biomass_totale.csv")
+write.csv2(df.results.totale,"modele_biomass_totale_sansoutliers.csv")
 
 kable(df.results.totale,caption = table.caption("Performances des modèles pour la biomasse totale des arbres (sans outliers)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 ```   
