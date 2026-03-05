@@ -63,18 +63,14 @@ suppressPackageStartupMessages(library(DHARMa))
 suppressPackageStartupMessages(library(cowplot))
 suppressPackageStartupMessages(library(lmtest))
 
-all_biomass <- read_excel("./all_data_biom_inventaire.xlsx", 
-                          sheet = "all_biomass")
+all_biomass <- read.csv("./data/data_biomass_destructive_20260305.csv")
 
+
+# compute total Biomass and CBHH2
 all_biomass = all_biomass %>% mutate(dry_biom_tot_kg = dry_allF_tot_kg+dry_Brviv_tot_kg+dry_tronc_tot_kg,
                                      CBHH2 = CBH_m*(HTOT_m)^2,
                                      classe = as.character(classe)) 
 
-data_volume = read_excel("./cubages_arbres.xlsx","cub avec ec") %>% 
-  select(age,ferti,classe,VSMALIAN_av_ec_m3) %>% 
-  mutate(classe = as.character(classe))
-
-all_biomass = all_biomass %>% left_join(data_volume)
 ```
 
 
@@ -584,7 +580,9 @@ On calibre donc les modèles à afficher dans l'article (biomasse tronc et bioma
 
 all_biomass = all_biomass %>% mutate(code = paste(age,ferti,classe,sep ="_"))
 
-all_biomass_wo = all_biomass %>% filter(!code %in% c("6_NF_8","5_F_2","5_F_4","4_NF_1","4_NF_2","4_F_1","4_F_5","4_F_6"), !age == 2)
+#all_biomass_wo = all_biomass %>% filter(!code %in% c("6_NF_8","5_F_2","5_F_4","4_NF_1","4_NF_2","4_F_1","4_F_5","4_F_6"), !age == 2)
+
+all_biomass_wo = all_biomass %>% filter(drone_flight == "yes")
 
 table(all_biomass_wo$age,all_biomass_wo$ferti)
 
