@@ -56,9 +56,17 @@ Ces statistiques constituent les 'variables drones' :
 - cyl_volume : le volume du cylindre que l'on ajuste sur le polygone de l'arbre (modèle)
 - cyl_lat_area : la surface latérale du cylindre ajusté sur le polygone de l'arbre (modèle)
 
-# Modélisation pour tous les traitements 
 
-## Estimation hauteur arbre 
+**Variable de biomasse mesurées sur le terrain**
+
+Les variables de biomasses qui ont été mesurée sur les terrain (destriction des arbres) sont les suivantes : 
+
+- dry_allF_tot_kg : biomasse sèche totale des feuilles en kg
+- dry_Brviv_tot_kg: biomasse sèche totale des branches vivantes en kg
+- dry_tronc_tot_kg:  biomasse sèche totale des tronc en kg
+- dry_biom_tot_kg:  biomasse sèche totale en kg
+
+# Estimation hauteur et CBH arbre 
 
 Deux modèles de régression linéaire sont calibrés entre la hauteur drone (H_drone) et la hauteur réelle de l'arbre (H_arbre) et entre H_drone et CBH
 
@@ -100,7 +108,7 @@ data_drone = data_drone %>% mutate(dry_biom_tot_kg = dry_allF_tot_kg+dry_Brviv_t
 ```
 
 
-```{r model_h echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 # Modélisation de la hauteur des arbres
 
 lm_h = lm(HTOT_m~X_max,data_drone)
@@ -130,9 +138,7 @@ hist(lm_cbh$residuals)
 ```
 
 
-
-
-```{r fig1, echo=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 ggplot(data_drone,aes(X_max,HTOT_m))+
   geom_point(aes(color = flight_ID))+
@@ -166,28 +172,19 @@ Le modèle obtient un R2 de `r round(summary(lm_h)$adj.r.squared,2)` avec une pe
 La qualité de la régression implique **qu'il n'y a à ce stade pas de correction à apporter aux données drones** des deux vols (des disparités entre les deux vols auraient pu apparaitre mais ce n'est pas le cas). 
 
 
+# Modélisation du volume et de la bioamsse
 
+Tout traitement confondu
 
-## Estimation de la biomasse
-
-### Variable de biomasse mesurées sur le terrain
-
-Les variables de biomasses qui ont été mesurée sur les terrain (destriction des arbres) sont les suivantes : 
-
-- dry_allF_tot_kg : biomasse sèche totale des feuilles en kg
-- dry_Brviv_tot_kg: biomasse sèche totale des branches vivantes en kg
-- dry_tronc_tot_kg:  biomasse sèche totale des tronc en kg
-- dry_biom_tot_kg:  biomasse sèche totale en kg
-
-### Corrélation entre variable biomasse et variable drone
+## Corrélation entre variable biomasse et variable drone
 
 On calcule la matrice des corrélations (2 à 2) entre les 3 variables drone, la hauteur et les 3 variables mesurées sur le terrain
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-m.data = data_drone %>% select(X_max,DSM_volume,DSM_area,
-                               hauteur.m,dry_allF_tot_kg,dry_Brviv_tot_kg,dry_tronc_tot_kg,dry_biom_tot_kg)
+m.data = data_drone %>% select(X_max,DSM_volume,DSM_area,X_volume_area,
+                               HTOT_m,dry_allF_tot_kg,dry_Brviv_tot_kg,dry_tronc_tot_kg,dry_biom_tot_kg)
 
 cor.biom = cor(m.data)  
 corrplot(cor.biom, type = "upper",method = "number")
@@ -195,68 +192,13 @@ corrplot(cor.biom, type = "upper",method = "number")
 ```
     
 
-### Modelisation de la biomasse réelle à partir des variables drone
+## Modelisation de la biomasse réelle à partir des variables drone
 
 Plusieurs modèles de régression sont testés successivement pour chaque variables de biomasse
 
-Une première série de modèles permet de constater que deux arbre (code_b_des = 17_6NF et 17_4F) sont outliers, leurs données drones sont en effet sur-évaluées. Pour l'établissement final des modèles on décide de retirer ces outliers. On passe à 38 arbres de calibration
+### Modèle biomasse sèche totale des feuilles
 
-Avant modélisation, les certaines variables drones sont réduites (par 10^5) car leur valeur sont beaucoup trop élevée par rapport aux variable sde biomasses à prédire (cela donne une pente très faible, nulle quand on arrondis)
-
-
-
-```{r echo=FALSE}
-
-# retrait d'arbres outliers (17_6NF, ligne 10 et 17_4F, ligne 20)
-data_drone_wo = data_drone %>% filter(!(year == "2017" & ferti =="F" & classe=="4"))
-data_drone_wo = data_drone_wo %>% filter(!(year == "2017" & ferti =="NF" & classe=="6"))
-
-  
-```
-    
-
-```{r, echo=FALSE}
-
-# Script performance modèle à partir de M. Carlier (2021)
-### Functions that calculate performance indices in order to evaluate the quality of a given model
-
-# bias : 
-# 
-# Computes the bias for a given model in calibration or validation data set
-# estimated : vector of prediction (with predict(lm) for example).
-# actual : vector of real values. It has to be the same size than the "estimated" vector.
-bias <- function(estimated, actual){
-  n <- length(actual)
-  return(round(sum(abs(estimated - actual))/n, 2))
-}
-
-# MAPE : 
-# 
-# Returns the mean absolute percentage error for a given model in calibration or validation data set
-# estimated : vector of prediction (with predict(lm) for example).
-# actual : vector of real values. It has to be the same size than the "estimated" vector.
-MAPE <- function(estimated, actual){
-  n <- length(actual)
-  MAPE <- 100/n*sum((abs(estimated - actual)/estimated))
-  return(round(MAPE, 2))
-}
-
-# R2 :
-# 
-# Returns the coefficient of determination of a given linear model.
-# lm : linear model 
-r2 <- function(lm){
-  r2 <- summary(lm)$adj.r.squared
-  return(round(r2, 3))
-}
-
-```
-
-**Estimation de la biomasse sèche totale des feuilles**
-
-```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-
-# AVEC OUTLIER
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 lm.f.1 <- lm(dry_allF_tot_kg ~ X_max, data=data_drone)
 lm.f.2 <- lm(dry_allF_tot_kg ~ DSM_area, data=data_drone)
@@ -278,155 +220,98 @@ pred.f.3 <- predict(lm.f.3)
 pred.f.4 <- predict(lm.f.4)
 pred.f.5 <- predict(lm.f.5)
 
-pred.f.6 <- exp(predict(lm.f.6)+mean(lm.f.6$residuals^2)/2)
-pred.f.7 <- exp(predict(lm.f.7)+mean(lm.f.7$residuals^2)/2)
-pred.f.8 <- exp(predict(lm.f.8)+mean(lm.f.8$residuals^2)/2)
-pred.f.9 <- exp(predict(lm.f.9)+mean(lm.f.9$residuals^2)/2)
-pred.f.10 <- exp(predict(lm.f.10)+mean(lm.f.10$residuals^2)/2)
+pred.f.6 <- exp(predict(lm.f.6)+0.5*summary(lm.f.6)$sigma^2)
+pred.f.7 <- exp(predict(lm.f.7)+0.5*summary(lm.f.7)$sigma^2)
+pred.f.8 <- exp(predict(lm.f.8)+0.5*summary(lm.f.8)$sigma^2)
+pred.f.9 <- exp(predict(lm.f.9)+0.5*summary(lm.f.9)$sigma^2)
+pred.f.10 <- exp(predict(lm.f.10)+0.5*summary(lm.f.10)$sigma^2)
 
 list.pred.feuille <- list(pred.f.1, pred.f.2, pred.f.3, pred.f.4, pred.f.5, pred.f.6, pred.f.7, pred.f.8, pred.f.9, pred.f.10)
 
 nb_model <- length(list.pred.feuille)
 nb_values <- length(list.pred.feuille[[1]])
+```
 
 
-bias.vec.f <- c()
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+bias.abs.vec.f <- c()
+bias.rel.vec.f <- c()
 MAPE.vec.f <- c()
 MAE.vec.f <- c()
 NRMSE.vec.f <- c()
 RMSE.vec.f <- c()
 r2.vec.f <- c()
+AIC.vec.f <- c()
+ks.test.vec.f <- c()
+sw.test.vec.f <- c()
+bp.test.vec.f <- c()
 a.vec.f <- c()
 b.vec.f <- c()
-shapiro.vec.f <- c()
+cf.vec.f <- c()
+
 variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
                "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
 
+
 for (i in 1:nb_model){
-  bias.vec.f[i] <- bias(unlist(list.pred.feuille[i]), data_drone$dry_allF_tot_kg)
-  MAPE.vec.f[i] <- MAPE(unlist(list.pred.feuille[i]), data_drone$dry_allF_tot_kg)
-  MAE.vec.f[i] <- round(MAE(unlist(list.pred.feuille[i]), data_drone$dry_allF_tot_kg), 2)
-  RMSE.vec.f[i] <- round(RMSE(unlist(list.pred.feuille[i]), data_drone$dry_allF_tot_kg), 2)
-  r2.vec.f[i] <- r2(list.lm.feuille[[i]])
-  NRMSE.vec.f[i] <- round(100*RMSE(unlist(list.pred.feuille[i]), data_drone$dry_allF_tot_kg)/mean(data_drone$dry_allF_tot_kg), 2)
-  shapiro.vec.f[i] <- shapiro.test(list.lm.feuille[[i]]$residuals)$p.value
+  bias.abs.vec.f[i] <- round(mean(unlist(list.pred.feuille[i]) - data_drone$dry_allF_tot_kg),2)
+  bias.rel.vec.f[i] <- round(mean((unlist(list.pred.feuille[i]) - data_drone$dry_allF_tot_kg) /
+                                        data_drone$dry_allF_tot_kg)*100,2)
+  MAPE.vec.f[i] <- round(mape(data_drone$dry_allF_tot_kg, unlist(list.pred.feuille[i]))*100,2)
+  MAE.vec.f[i] <- round(mae(data_drone$dry_allF_tot_kg, unlist(list.pred.feuille[i])), 2)
+  RMSE.vec.f[i] <- round(rmse(data_drone$dry_allF_tot_kg, unlist(list.pred.feuille[i])), 2)
+  r2.vec.f[i] <- round(summary(list.lm.feuille[[i]])$adj.r.squared,2)
+  AIC.vec.f[i]<- round(AIC(list.lm.feuille[[i]]),2)
+  NRMSE.vec.f[i] <- round(100*rmse(data_drone$dry_allF_tot_kg, unlist(list.pred.feuille[i]))
+                          /mean(data_drone$dry_allF_tot_kg), 2)
+  ks.test.vec.f[i] = round(testUniformity((simulateResiduals(list.lm.feuille[[i]])),plot =F)$p.value,2)
+  sw.test.vec.f[i] = round(shapiro.test(residuals(list.lm.feuille[[i]]))$p.value,2)
+  bp.test.vec.f[i] = round(bptest(list.lm.feuille[[i]])$p.value,2)
+   a.vec.f[i] <- round(list.lm.feuille[[i]]$coefficients[1],2)
+  b.vec.f[i] <- round(list.lm.feuille[[i]]$coefficients[2],2)
   
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.f[i] <- list.lm.feuille[[i]]$coefficients[2]
-    b.vec.f[i] <- exp(list.lm.feuille[[i]]$coefficients[1])
-    
+  if(grepl("log", variables[i])){
+    a.vec.f[i] <- round(exp(list.lm.feuille[[i]]$coefficients[1]),2)
+    cf.vec.f[i] <- round(exp(0.5*summary(list.lm.feuille[[i]])$sigma^2),2)
   }
-  else {
-    a.vec.f[i] <- list.lm.feuille[[i]]$coefficients[2]
-    b.vec.f[i] <- list.lm.feuille[[i]]$coefficients[1]
-    
-  } 
 }
 
-
-df.results.feuille <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.f, "MAE" = MAE.vec.f, "RMSE" = RMSE.vec.f, "MAPE" = MAPE.vec.f, "NRMSE" = NRMSE.vec.f, "r2" = r2.vec.f, "shapiro" = shapiro.vec.f, "a" = a.vec.f, "b" = b.vec.f)
-df.results.feuille
-```
-  
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-# SANS OUTLIER
-
-lm.f.1 <- lm(dry_allF_tot_kg ~ X_max, data=data_drone_wo)
-lm.f.2 <- lm(dry_allF_tot_kg ~ DSM_area, data=data_drone_wo)
-lm.f.3 <- lm(dry_allF_tot_kg ~ DSM_volume, data=data_drone_wo)
-lm.f.4 <- lm(dry_allF_tot_kg ~ X_volume_area, data=data_drone_wo)
-lm.f.5 <- lm(dry_allF_tot_kg ~ cyl_volume,data = data_drone_wo)
-
-lm.f.6 <- lm(log(dry_allF_tot_kg)~log(X_max), data=data_drone_wo)
-lm.f.7 <- lm(log(dry_allF_tot_kg)~log(DSM_area), data=data_drone_wo)
-lm.f.8 <- lm(log(dry_allF_tot_kg)~log(DSM_volume), data=data_drone_wo)
-lm.f.9 <- lm(log(dry_allF_tot_kg)~log(X_volume_area), data=data_drone_wo)
-lm.f.10 <- lm(log(dry_allF_tot_kg)~log(cyl_volume), data=data_drone_wo)
-
-list.lm.feuille <- list(lm.f.1, lm.f.2, lm.f.3, lm.f.4, lm.f.5, lm.f.6, lm.f.7, lm.f.8,lm.f.9,lm.f.10)
-
-pred.f.1 <- predict(lm.f.1)
-pred.f.2 <- predict(lm.f.2)
-pred.f.3 <- predict(lm.f.3)
-pred.f.4 <- predict(lm.f.4)
-pred.f.5 <- predict(lm.f.5)
-
-pred.f.6 <- exp(predict(lm.f.6)+mean(lm.f.6$residuals^2)/2)
-pred.f.7 <- exp(predict(lm.f.7)+mean(lm.f.7$residuals^2)/2)
-pred.f.8 <- exp(predict(lm.f.8)+mean(lm.f.8$residuals^2)/2)
-pred.f.9 <- exp(predict(lm.f.9)+mean(lm.f.9$residuals^2)/2)
-pred.f.10 <- exp(predict(lm.f.10)+mean(lm.f.10$residuals^2)/2)
-
-list.pred.feuille <- list(pred.f.1, pred.f.2, pred.f.3, pred.f.4, pred.f.5, pred.f.6, pred.f.7, pred.f.8, pred.f.9, pred.f.10)
-
-nb_model <- length(list.pred.feuille)
-nb_values <- length(list.pred.feuille[[1]])
-  
-```
- 
-```{r, echo=FALSE}
-bias.vec.f <- c()
-MAPE.vec.f <- c()
-MAE.vec.f <- c()
-NRMSE.vec.f <- c()
-RMSE.vec.f <- c()
-r2.vec.f <- c()
-a.vec.f <- c()
-b.vec.f <- c()
-shapiro.vec.f <- c()
-variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
-               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
-
-for (i in 1:nb_model){
-  bias.vec.f[i] <- bias(unlist(list.pred.feuille[i]), data_drone_wo$dry_allF_tot_kg)
-  MAPE.vec.f[i] <- MAPE(unlist(list.pred.feuille[i]), data_drone_wo$dry_allF_tot_kg)
-  MAE.vec.f[i] <- round(MAE(unlist(list.pred.feuille[i]), data_drone_wo$dry_allF_tot_kg), 2)
-  RMSE.vec.f[i] <- round(RMSE(unlist(list.pred.feuille[i]), data_drone_wo$dry_allF_tot_kg), 2)
-  r2.vec.f[i] <- r2(list.lm.feuille[[i]])
-  NRMSE.vec.f[i] <- round(100*RMSE(unlist(list.pred.feuille[i]), data_drone_wo$dry_allF_tot_kg)/mean(data_drone_wo$dry_allF_tot_kg), 2)
-  shapiro.vec.f[i] <- round(shapiro.test(list.lm.feuille[[i]]$residuals)$p.value,2)
-}
-
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.f[i] <- round(list.lm.feuille[[i]]$coefficients[2],2)
-    b.vec.f[i] <- round(exp(list.lm.feuille[[i]]$coefficients[1]),2)
- }
-  else {
-    a.vec.f[i] <- round(list.lm.feuille[[i]]$coefficients[2],2)
-    b.vec.f[i] <- round(list.lm.feuille[[i]]$coefficients[1],2)
-  } 
-}
+df.results.feuille <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.f, "bias_rel" = bias.rel.vec.f, 
+                                    "MAE" = MAE.vec.f, "MAPE" = MAPE.vec.f, 
+                                    "RMSE" = RMSE.vec.f, "NRMSE" = NRMSE.vec.f, 
+                                    "r2" = r2.vec.f,"AIC" = AIC.vec.f,
+                                    "KS" = ks.test.vec.f, "SW" = sw.test.vec.f,
+                                    "BP" = bp.test.vec.f,
+                                    "a" = a.vec.f, "b" = b.vec.f, 
+                                    "CF" = cf.vec.f)
 
 
-df.results.feuille <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.f, "MAE" = MAE.vec.f, "RMSE" = RMSE.vec.f, "MAPE" = MAPE.vec.f, "NRMSE" = NRMSE.vec.f, "r2" = r2.vec.f, "shapiro" = shapiro.vec.f,"a" = a.vec.f, "b" = b.vec.f)
+write.csv2(df.results.feuille,"data_output/modele_uav_biomass_feuilles.csv",row.names = FALSE)
 
-write.csv2(df.results.feuille,"modele_biomass_feuille.csv")
+kable(df.results.feuille,
+      caption = table.caption("Performances des modèles pour la biomasse des feuilles (40 arbres)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
-kable(df.results.feuille,caption = table.caption("Performances des modèles pour la biomasse des feuilles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
 ```
- 
-**Estimation de la biomasse sèche totale des branches**
+
+
+### Modèle biomasse sèche des branches
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-# SANS OUTLIER 
+lm.b.1 <- lm(dry_Brviv_tot_kg ~ X_max, data=data_drone)
+lm.b.2 <- lm(dry_Brviv_tot_kg ~ DSM_area, data=data_drone)
+lm.b.3 <- lm(dry_Brviv_tot_kg ~ DSM_volume, data=data_drone)
+lm.b.4 <- lm(dry_Brviv_tot_kg ~ X_volume_area, data=data_drone)
+lm.b.5 <- lm(dry_Brviv_tot_kg ~ cyl_volume, data=data_drone)
 
-lm.b.1 <- lm(dry_Brviv_tot_kg ~ X_max, data=data_drone_wo)
-lm.b.2 <- lm(dry_Brviv_tot_kg ~ DSM_area, data=data_drone_wo)
-lm.b.3 <- lm(dry_Brviv_tot_kg ~ DSM_volume, data=data_drone_wo)
-lm.b.4 <- lm(dry_Brviv_tot_kg ~ X_volume_area, data=data_drone_wo)
-lm.b.5 <- lm(dry_Brviv_tot_kg ~ cyl_volume, data=data_drone_wo)
-
-lm.b.6 <- lm(log(dry_Brviv_tot_kg)~log(X_max), data=data_drone_wo)
-lm.b.7 <- lm(log(dry_Brviv_tot_kg)~log(DSM_area), data=data_drone_wo)
-lm.b.8 <- lm(log(dry_Brviv_tot_kg)~log(DSM_volume), data=data_drone_wo)
-lm.b.9 <- lm(log(dry_Brviv_tot_kg)~log(X_volume_area), data=data_drone_wo)
-lm.b.10 <- lm(log(dry_Brviv_tot_kg)~log(cyl_volume), data=data_drone_wo)
+lm.b.6 <- lm(log(dry_Brviv_tot_kg)~log(X_max), data=data_drone)
+lm.b.7 <- lm(log(dry_Brviv_tot_kg)~log(DSM_area), data=data_drone)
+lm.b.8 <- lm(log(dry_Brviv_tot_kg)~log(DSM_volume), data=data_drone)
+lm.b.9 <- lm(log(dry_Brviv_tot_kg)~log(X_volume_area), data=data_drone)
+lm.b.10 <- lm(log(dry_Brviv_tot_kg)~log(cyl_volume), data=data_drone)
 
 list.lm.branche <- list(lm.b.1, lm.b.2, lm.b.3, lm.b.4, lm.b.5, lm.b.6, lm.b.7, lm.b.8, lm.b.9, lm.b.10)
 
@@ -436,11 +321,11 @@ pred.b.3 <- predict(lm.b.3)
 pred.b.4 <- predict(lm.b.4)
 pred.b.5 <- predict(lm.b.5)
 
-pred.b.6 <- exp(predict(lm.b.6)+mean(lm.b.6$residuals^2)/2)
-pred.b.7 <- exp(predict(lm.b.7)+mean(lm.b.7$residuals^2)/2)
-pred.b.8 <- exp(predict(lm.b.8)+mean(lm.b.8$residuals^2)/2)
-pred.b.9 <- exp(predict(lm.b.9)+mean(lm.b.9$residuals^2)/2)
-pred.b.10 <- exp(predict(lm.b.10)+mean(lm.b.10$residuals^2)/2)
+pred.b.6 <- exp(predict(lm.b.6)+0.5*summary(lm.b.6)$sigma^2)
+pred.b.7 <- exp(predict(lm.b.7)+0.5*summary(lm.b.7)$sigma^2)
+pred.b.8 <- exp(predict(lm.b.8)+0.5*summary(lm.b.8)$sigma^2)
+pred.b.9 <- exp(predict(lm.b.9)+0.5*summary(lm.b.9)$sigma^2)
+pred.b.10 <- exp(predict(lm.b.10)+0.5*summary(lm.b.10)$sigma^2)
 
 list.pred.branche <- list(pred.b.1, pred.b.2, pred.b.3, pred.b.4, pred.b.5, pred.b.6, pred.b.7, pred.b.8, pred.b.9, pred.b.10)
 
@@ -449,66 +334,84 @@ nb_values <- length(list.lm.branche[[1]])
   
 ```
 
-```{r, echo=FALSE}
-bias.vec.b <- c()
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+bias.abs.vec.b <- c()
+bias.rel.vec.b <- c()
 MAPE.vec.b <- c()
 MAE.vec.b <- c()
 NRMSE.vec.b <- c()
 RMSE.vec.b <- c()
 r2.vec.b <- c()
+AIC.vec.b <- c()
+ks.test.vec.b <- c()
+sw.test.vec.b <- c()
+bp.test.vec.b <- c()
 a.vec.b <- c()
 b.vec.b <- c()
-shapiro.vec.f <- c()
+cf.vec.b <- c()
+
 variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
                "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
 
+
 for (i in 1:nb_model){
-  bias.vec.b[i] <- bias(unlist(list.pred.branche[i]), data_drone_wo$dry_Brviv_tot_kg)
-  MAPE.vec.b[i] <- MAPE(unlist(list.pred.branche[i]), data_drone_wo$dry_Brviv_tot_kg)
-  MAE.vec.b[i] <- round(MAE(unlist(list.pred.branche[i]), data_drone_wo$dry_Brviv_tot_kg), 2)
-  RMSE.vec.b[i] <- round(RMSE(unlist(list.pred.branche[i]), data_drone_wo$dry_Brviv_tot_kg), 2)
-  r2.vec.b[i] <- r2(list.lm.branche[[i]])
-  NRMSE.vec.b[i] <- round(100*RMSE(unlist(list.pred.branche[i]), data_drone_wo$dry_Brviv_tot_kg)/mean(data_drone_wo$dry_Brviv_tot_kg), 2)
-  shapiro.vec.f[i] <- round(shapiro.test(list.lm.branche[[i]]$residuals)$p.value,2)
+  bias.abs.vec.b[i] <- round(mean(unlist(list.pred.branche[i]) - data_drone$dry_Brviv_tot_kg),2)
+  bias.rel.vec.b[i] <- round(mean((unlist(list.pred.branche[i]) - data_drone$dry_Brviv_tot_kg) /
+                                        data_drone$dry_Brviv_tot_kg)*100,2)
+  MAPE.vec.b[i] <- round(mape(data_drone$dry_Brviv_tot_kg, unlist(list.pred.branche[i]))*100,2)
+  MAE.vec.b[i] <- round(mae(data_drone$dry_Brviv_tot_kg, unlist(list.pred.branche[i])), 2)
+  RMSE.vec.b[i] <- round(rmse(data_drone$dry_Brviv_tot_kg, unlist(list.pred.branche[i])), 2)
+  r2.vec.b[i] <- round(summary(list.lm.branche[[i]])$adj.r.squared,2)
+  AIC.vec.b[i]<- round(AIC(list.lm.branche[[i]]),2)
+  NRMSE.vec.b[i] <- round(100*rmse(data_drone$dry_Brviv_tot_kg, unlist(list.pred.branche[i]))
+                          /mean(data_drone$dry_Brviv_tot_kg), 2)
+  ks.test.vec.b[i] = round(testUniformity((simulateResiduals(list.lm.branche[[i]])),plot =F)$p.value,2)
+  sw.test.vec.b[i] = round(shapiro.test(residuals(list.lm.branche[[i]]))$p.value,2)
+  bp.test.vec.b[i] = round(bptest(list.lm.branche[[i]])$p.value,2)
+   a.vec.b[i] <- round(list.lm.branche[[i]]$coefficients[1],2)
+  b.vec.b[i] <- round(list.lm.branche[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.b[i] <- round(exp(list.lm.branche[[i]]$coefficients[1]),2)
+    cf.vec.b[i] <- round(exp(0.5*summary(list.lm.branche[[i]])$sigma^2),2)
+  }
 }
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.b[i] <- round(list.lm.branche[[i]]$coefficients[2],2)
-    b.vec.b[i] <- round(exp(list.lm.branche[[i]]$coefficients[1]),2)
- }
-  else {
-    a.vec.b[i] <- round(list.lm.branche[[i]]$coefficients[2],2)
-    b.vec.b[i] <- round(list.lm.branche[[i]]$coefficients[1],2)
- } 
-}
+
+df.results.branche <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.b, "bias_rel" = bias.rel.vec.b, 
+                                    "MAE" = MAE.vec.b, "MAPE" = MAPE.vec.b, 
+                                    "RMSE" = RMSE.vec.b, "NRMSE" = NRMSE.vec.b, 
+                                    "r2" = r2.vec.b,"AIC" = AIC.vec.b,
+                                    "KS" = ks.test.vec.b, "SW" = sw.test.vec.b,
+                                    "BP" = bp.test.vec.b,
+                                    "a" = a.vec.b, "b" = b.vec.b, 
+                                    "CF" = cf.vec.b)
 
 
-df.results.branche <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.b, "MAE" = MAE.vec.b, "RMSE" = RMSE.vec.b, "MAPE" = MAPE.vec.b, "NRMSE" = NRMSE.vec.b, "r2" = r2.vec.b,"shapiro" = shapiro.vec.f, "a" = a.vec.b, "b" = b.vec.b)
-
-write.csv2(df.results.branche,"modele_biomass_branche.csv")
+write.csv2(df.results.branche,"data_output/modele_uav_biomass_branche.csv",row.names = FALSE)
 
 kable(df.results.branche,
-      caption = table.caption("Performances des modèles pour la biomasse des branches"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+      caption = table.caption("Performances des modèles pour la biomasse des branches (40 arbres)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 ```
   
   
-**Estimation de la biomasse sèche totale des tronc**
+### Modèle biomasse sèche des tronc
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-#SANS OUTLIER 
+lm.t.1 <- lm(dry_tronc_tot_kg ~ X_max, data=data_drone)
+lm.t.2 <- lm(dry_tronc_tot_kg ~ DSM_area, data=data_drone)
+lm.t.3 <- lm(dry_tronc_tot_kg ~ DSM_volume, data=data_drone)
+lm.t.4 <- lm(dry_tronc_tot_kg ~ X_volume_area, data=data_drone)
+lm.t.5 <- lm(dry_tronc_tot_kg ~ cyl_volume, data=data_drone)
 
-lm.t.1 <- lm(dry_tronc_tot_kg ~ X_max, data=data_drone_wo)
-lm.t.2 <- lm(dry_tronc_tot_kg ~ DSM_area, data=data_drone_wo)
-lm.t.3 <- lm(dry_tronc_tot_kg ~ DSM_volume, data=data_drone_wo)
-lm.t.4 <- lm(dry_tronc_tot_kg ~ X_volume_area, data=data_drone_wo)
-lm.t.5 <- lm(dry_tronc_tot_kg ~ cyl_volume, data=data_drone_wo)
-
-lm.t.6 <- lm(log(dry_tronc_tot_kg)~log(X_max), data=data_drone_wo)
-lm.t.7 <- lm(log(dry_tronc_tot_kg)~log(DSM_area), data=data_drone_wo)
-lm.t.8 <- lm(log(dry_tronc_tot_kg)~log(DSM_volume), data=data_drone_wo)
-lm.t.9 <- lm(log(dry_tronc_tot_kg)~log(X_volume_area), data=data_drone_wo)
-lm.t.10 <- lm(log(dry_tronc_tot_kg) ~ log(cyl_volume), data=data_drone_wo)
+lm.t.6 <- lm(log(dry_tronc_tot_kg)~log(X_max), data=data_drone)
+lm.t.7 <- lm(log(dry_tronc_tot_kg)~log(DSM_area), data=data_drone)
+lm.t.8 <- lm(log(dry_tronc_tot_kg)~log(DSM_volume), data=data_drone)
+lm.t.9 <- lm(log(dry_tronc_tot_kg)~log(X_volume_area), data=data_drone)
+lm.t.10 <- lm(log(dry_tronc_tot_kg) ~ log(cyl_volume), data=data_drone)
 
 list.lm.tronc <- list(lm.t.1, lm.t.2, lm.t.3, lm.t.4, lm.t.5, lm.t.6, lm.t.7, lm.t.8, lm.t.9, lm.t.10)
 
@@ -518,11 +421,11 @@ pred.t.3 <- predict(lm.t.3)
 pred.t.4 <- predict(lm.t.4)
 pred.t.5 <- predict(lm.t.5)
 
-pred.t.6 <- exp(predict(lm.t.6)+mean(lm.t.6$residuals^2)/2)
-pred.t.7 <- exp(predict(lm.t.7)+mean(lm.t.7$residuals^2)/2)
-pred.t.8 <- exp(predict(lm.t.8)+mean(lm.t.8$residuals^2)/2)
-pred.t.9 <- exp(predict(lm.t.9)+mean(lm.t.9$residuals^2)/2)
-pred.t.10 <- exp(predict(lm.t.10)+mean(lm.t.10$residuals^2)/2)
+pred.t.6 <- exp(predict(lm.t.6)+0.5*summary(lm.t.6)$sigma^2)
+pred.t.7 <- exp(predict(lm.t.7)+0.5*summary(lm.t.7)$sigma^2)
+pred.t.8 <- exp(predict(lm.t.8)+0.5*summary(lm.t.8)$sigma^2)
+pred.t.9 <- exp(predict(lm.t.9)+0.5*summary(lm.t.9)$sigma^2)
+pred.t.10 <- exp(predict(lm.t.10)+0.5*summary(lm.t.10)$sigma^2)
 
 list.pred.tronc <- list(pred.t.1, pred.t.2, pred.t.3, pred.t.4, pred.t.5, pred.t.6, pred.t.7, pred.t.8, pred.t.9, pred.t.10)
 
@@ -531,164 +434,87 @@ nb_values <- length(list.lm.tronc[[1]])
   
 ```
 
-```{r, echo=FALSE}
-bias.vec.t <- c()
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+bias.abs.vec.t <- c()
+bias.rel.vec.t <- c()
 MAPE.vec.t <- c()
 MAE.vec.t <- c()
 NRMSE.vec.t <- c()
 RMSE.vec.t <- c()
 r2.vec.t <- c()
+AIC.vec.t <- c()
+ks.test.vec.t <- c()
+sw.test.vec.t <- c()
+bp.test.vec.t <- c()
 a.vec.t <- c()
 b.vec.t <- c()
-shapiro.vec.f <- c()
-variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
-               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
-
-for (i in 1:nb_model){
-  bias.vec.t[i] <- bias(unlist(list.pred.tronc[i]), data_drone_wo$dry_tronc_tot_kg)
-  MAPE.vec.t[i] <- MAPE(unlist(list.pred.tronc[i]), data_drone_wo$dry_tronc_tot_kg)
-  MAE.vec.t[i] <- round(MAE(unlist(list.pred.tronc[i]), data_drone_wo$dry_tronc_tot_kg), 2)
-  RMSE.vec.t[i] <- round(RMSE(unlist(list.pred.tronc[i]), data_drone_wo$dry_tronc_tot_kg), 2)
-  r2.vec.t[i] <- r2(list.lm.tronc[[i]])
-  NRMSE.vec.t[i] <- round(100*RMSE(unlist(list.pred.tronc[i]), data_drone_wo$dry_tronc_tot_kg)/mean(data_drone_wo$dry_tronc_tot_kg), 2)
-  shapiro.vec.f[i] <- round(shapiro.test(list.lm.tronc[[i]]$residuals)$p.value,2)
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.t[i] <- round(list.lm.tronc[[i]]$coefficients[2],2)
-    b.vec.t[i] <- round(exp(list.lm.tronc[[i]]$coefficients[1]),2)
-}
-  else {
-    a.vec.t[i] <- round(list.lm.tronc[[i]]$coefficients[2],2)
-    b.vec.t[i] <- round(list.lm.tronc[[i]]$coefficients[1],2)
-  } 
-}
-
-
-df.results.tronc <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.t, "MAE" = MAE.vec.t, "RMSE" = RMSE.vec.t, "MAPE" = MAPE.vec.t, "NRMSE" = NRMSE.vec.t, "r2" = r2.vec.t, "shapiro" = shapiro.vec.f,"a" = a.vec.t, "b" = b.vec.t)
-
-write.csv2(df.results.tronc,"modele_biomass_tronc.csv")
-
-kable(df.results.tronc,caption = table.caption("Performances des modèles pour la biomasse des troncs"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-
-```
- 
-**Estimation de la biomasse sèche totale des arbres**
-
-*Avec les outliers*
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-# AVEC OUTLIER
-
-lm.tot.out.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_drone)
-lm.tot.out.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_drone)
-lm.tot.out.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_drone)
-lm.tot.out.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_drone)
-lm.tot.out.5 <- lm(dry_biom_tot_kg ~ cyl_volume, data=data_drone)
-
-lm.tot.out.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_drone)
-lm.tot.out.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_drone)
-lm.tot.out.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_drone)
-lm.tot.out.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone)
-lm.tot.out.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_drone_wo)
-
-list.lm.tot.out <- list(lm.tot.out.1, lm.tot.out.2, lm.tot.out.3, lm.tot.out.4, lm.tot.out.5, lm.tot.out.6, lm.tot.out.7, lm.tot.out.8,lm.tot.out.9,lm.tot.out.10)
-
-pred.tot.out.1 <- predict(lm.tot.out.1)
-pred.tot.out.2 <- predict(lm.tot.out.2)
-pred.tot.out.3 <- predict(lm.tot.out.3)
-pred.tot.out.4 <- predict(lm.tot.out.4)
-pred.tot.out.5 <- predict(lm.tot.out.5)
-
-pred.tot.out.6 <- exp(predict(lm.tot.out.6)+0.5*summary(lm.tot.6)$sigma^2)
-pred.tot.out.7 <- exp(predict(lm.tot.out.7)+0.5*summary(lm.tot.7)$sigma^2)
-pred.tot.out.8 <- exp(predict(lm.tot.out.8)+0.5*summary(lm.tot.8)$sigma^2)
-pred.tot.out.9 <- exp(predict(lm.tot.out.9)+0.5*summary(lm.tot.9)$sigma^2)
-pred.tot.out.10 <- exp(predict(lm.tot.out.10)+0.5*summary(lm.tot.10)$sigma^2)
-
-list.pred.tot.out <- list(pred.tot.out.1, pred.tot.out.2, pred.tot.out.3, pred.tot.out.4, pred.tot.out.5, pred.tot.out.6, pred.tot.out.7, pred.tot.out.8,pred.tot.out.9,pred.tot.out.10)
-
-nb_model <- length(list.pred.tot.out)
-nb_values <- length(list.pred.tot.out[[1]])
-
-bias.abs.vec.tot.out <- c()
-bias.rel.vec.tot.out <- c()
-MAPE.vec.tot.out <- c()
-MAE.vec.tot.out <- c()
-NRMSE.vec.tot.out <- c()
-RMSE.vec.tot.out <- c()
-r2.vec.tot.out <- c()
-AIC.vec.tot.out <- c()
-ks.test.vec.tot.out <- c()
-sw.test.vec.tot.out <- c()
-bp.test.vec.tot.out <- c()
-a.vec.tot.out <- c()
-b.vec.tot.out <- c()
-cf.vec.tot.out <- c()
+cf.vec.t <- c()
 
 variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
                "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
 
 
 for (i in 1:nb_model){
-  bias.abs.vec.tot.out[i] <- round(mean(unlist(list.pred.tot.out[i]) - data_drone$dry_biom_tot_kg),2)
-  bias.rel.vec.tot.out[i] <- round(mean((unlist(list.pred.tot.out[i]) - data_drone$dry_biom_tot_kg) /
-                                        data_drone$dry_biom_tot_kg)*100,2)
-  MAPE.vec.tot.out[i] <- round(mape(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i]))*100,2)
-  MAE.vec.tot.out[i] <- round(mae(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i])), 2)
-  RMSE.vec.tot.out[i] <- round(rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i])), 2)
-  r2.vec.tot.out[i] <- round(summary(list.lm.tot.out[[i]])$adj.r.squared,2)
-  AIC.vec.tot.out[i]<- round(AIC(list.lm.tot.out[[i]]),2)
-  NRMSE.vec.tot.out[i] <- round(100*rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot.out[i]))
-                          /mean(data_drone$dry_biom_tot_kg), 2)
-  ks.test.vec.tot.out[i] = round(testUniformity((simulateResiduals(list.lm.tot.out[[i]])),plot =F)$p.value,2)
-  sw.test.vec.tot.out[i] = round(shapiro.test(residuals(list.lm.tot.out[[i]]))$p.value,2)
-  bp.test.vec.tot.out[i] = round(bptest(list.lm.tot.out[[i]])$p.value,2)
-   a.vec.tot.out[i] <- round(list.lm.tot.out[[i]]$coefficients[1],2)
-  b.vec.tot.out[i] <- round(list.lm.tot.out[[i]]$coefficients[2],2)
+  bias.abs.vec.t[i] <- round(mean(unlist(list.pred.tronc[i]) - data_drone$dry_tronc_tot_kg),2)
+  bias.rel.vec.t[i] <- round(mean((unlist(list.pred.tronc[i]) - data_drone$dry_tronc_tot_kg) /
+                                        data_drone$dry_tronc_tot_kg)*100,2)
+  MAPE.vec.t[i] <- round(mape(data_drone$dry_tronc_tot_kg, unlist(list.pred.tronc[i]))*100,2)
+  MAE.vec.t[i] <- round(mae(data_drone$dry_tronc_tot_kg, unlist(list.pred.tronc[i])), 2)
+  RMSE.vec.t[i] <- round(rmse(data_drone$dry_tronc_tot_kg, unlist(list.pred.tronc[i])), 2)
+  r2.vec.t[i] <- round(summary(list.lm.tronc[[i]])$adj.r.squared,2)
+  AIC.vec.t[i]<- round(AIC(list.lm.tronc[[i]]),2)
+  NRMSE.vec.t[i] <- round(100*rmse(data_drone$dry_tronc_tot_kg, unlist(list.pred.tronc[i]))
+                          /mean(data_drone$dry_tronc_tot_kg), 2)
+  ks.test.vec.t[i] = round(testUniformity((simulateResiduals(list.lm.tronc[[i]])),plot =F)$p.value,2)
+  sw.test.vec.t[i] = round(shapiro.test(residuals(list.lm.tronc[[i]]))$p.value,2)
+  bp.test.vec.t[i] = round(bptest(list.lm.tronc[[i]])$p.value,2)
+   a.vec.t[i] <- round(list.lm.tronc[[i]]$coefficients[1],2)
+  b.vec.t[i] <- round(list.lm.tronc[[i]]$coefficients[2],2)
   
   if(grepl("log", variables[i])){
-    a.vec.tot.out[i] <- round(exp(list.lm.tot.out[[i]]$coefficients[1]),2)
-    cf.vec.tot.out[i] <- round(exp(0.5*summary(list.lm.tot.out[[i]])$sigma^2),2)
+    a.vec.t[i] <- round(exp(list.lm.tronc[[i]]$coefficients[1]),2)
+    cf.vec.t[i] <- round(exp(0.5*summary(list.lm.tronc[[i]])$sigma^2),2)
   }
 }
 
-df.results.tot.out <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
-                                    "bias_abs" = bias.abs.vec.tot.out, "bias_rel" = bias.rel.vec.tot.out, 
-                                    "MAE" = MAE.vec.tot.out, "MAPE" = MAPE.vec.tot.out, 
-                                    "RMSE" = RMSE.vec.tot.out, "NRMSE" = NRMSE.vec.tot.out, 
-                                    "r2" = r2.vec.tot.out,"AIC" = AIC.vec.tot.out,
-                                    "KS" = ks.test.vec.tot.out, "SW" = sw.test.vec.tot.out,
-                                    "BP" = bp.test.vec.tot.out,
-                                    "a" = a.vec.tot.out, "b" = b.vec.tot.out, 
-                                    "CF" = cf.vec.tot.out)
+df.results.tronc <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.t, "bias_rel" = bias.rel.vec.t, 
+                                    "MAE" = MAE.vec.t, "MAPE" = MAPE.vec.t, 
+                                    "RMSE" = RMSE.vec.t, "NRMSE" = NRMSE.vec.t, 
+                                    "r2" = r2.vec.t,"AIC" = AIC.vec.t,
+                                    "KS" = ks.test.vec.t, "SW" = sw.test.vec.t,
+                                    "BP" = bp.test.vec.t,
+                                    "a" = a.vec.t, "b" = b.vec.t, 
+                                    "CF" = cf.vec.t)
 
 
-write.csv2(df.results.tot.out,"modele_biomass_totale_avecoutliers.csv")
+write.csv2(df.results.tronc,"data_output/modele_uav_biomass_tronc.csv",row.names = FALSE)
 
-kable(df.results.tot.out,caption = table.caption("Performances des modèles pour la biomasse totale des arbres (avec outliers)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+kable(df.results.tronc,caption = table.caption("Performances des modèles pour la biomasse des troncs (40 arbres)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
 ```
 
-*Sans outliers*
+ 
+### Modèle biomasse sèche totale
+
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-# SANS OUTLIER
-lm.tot.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_drone_wo)
-lm.tot.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_drone_wo)
-lm.tot.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_drone_wo)
-lm.tot.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_drone_wo)
-lm.tot.5 <- lm(dry_biom_tot_kg ~ cyl_volume, data=data_drone_wo)
+lm.tot.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_drone)
+lm.tot.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_drone)
+lm.tot.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_drone)
+lm.tot.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_drone)
+lm.tot.5 <- lm(dry_biom_tot_kg ~ cyl_volume, data=data_drone)
 
-lm.tot.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_drone_wo)
-lm.tot.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_drone_wo)
-lm.tot.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_drone_wo)
-lm.tot.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone_wo)
-lm.tot.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_drone_wo)
+lm.tot.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_drone)
+lm.tot.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_drone)
+lm.tot.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_drone)
+lm.tot.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone)
+lm.tot.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_drone)
 
-list.lm.totale <- list(lm.tot.1, lm.tot.2, lm.tot.3, lm.tot.4, lm.tot.5, lm.tot.6, lm.tot.7, lm.tot.8, lm.tot.9, lm.tot.10)
+list.lm.tot <- list(lm.tot.1, lm.tot.2, lm.tot.3, lm.tot.4, lm.tot.5, lm.tot.6, lm.tot.7, lm.tot.8,lm.tot.9,lm.tot.10)
 
 pred.tot.1 <- predict(lm.tot.1)
 pred.tot.2 <- predict(lm.tot.2)
@@ -702,14 +528,14 @@ pred.tot.8 <- exp(predict(lm.tot.8)+0.5*summary(lm.tot.8)$sigma^2)
 pred.tot.9 <- exp(predict(lm.tot.9)+0.5*summary(lm.tot.9)$sigma^2)
 pred.tot.10 <- exp(predict(lm.tot.10)+0.5*summary(lm.tot.10)$sigma^2)
 
-list.pred.totale <- list(pred.tot.1, pred.tot.2, pred.tot.3, pred.tot.4, pred.tot.5, pred.tot.6, pred.tot.7, pred.tot.8, pred.tot.9, pred.tot.10)
+list.pred.tot <- list(pred.tot.1, pred.tot.2, pred.tot.3, pred.tot.4, pred.tot.5, pred.tot.6, pred.tot.7, pred.tot.8,pred.tot.9,pred.tot.10)
 
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
+nb_model <- length(list.pred.tot)
+nb_values <- length(list.pred.tot[[1]])
+
 ```
 
-```{r, echo=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 bias.abs.vec.tot <- c()
 bias.rel.vec.tot <- c()
@@ -731,29 +557,29 @@ variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
 
 
 for (i in 1:nb_model){
-  bias.abs.vec.tot[i] <- round(mean(unlist(list.pred.totale[i]) - data_drone_wo$dry_biom_tot_kg),2)
-  bias.rel.vec.tot[i] <- round(mean((unlist(list.pred.totale[i]) - data_drone_wo$dry_biom_tot_kg) /
-                                        data_drone_wo$dry_biom_tot_kg)*100,2)
-  MAPE.vec.tot[i] <- round(mape(data_drone_wo$dry_biom_tot_kg, unlist(list.pred.totale[i]))*100,2)
-  MAE.vec.tot[i] <- round(mae(data_drone_wo$dry_biom_tot_kg, unlist(list.pred.totale[i])), 2)
-  RMSE.vec.tot[i] <- round(rmse(data_drone_wo$dry_biom_tot_kg, unlist(list.pred.totale[i])), 2)
-  r2.vec.tot[i] <- round(summary(list.lm.totale[[i]])$adj.r.squared,2)
-  AIC.vec.tot[i]<- round(AIC(list.lm.totale[[i]]),2)
-  NRMSE.vec.tot[i] <- round(100*rmse(data_drone_wo$dry_biom_tot_kg, unlist(list.pred.totale[i]))
-                          /mean(data_drone_wo$dry_biom_tot_kg), 2)
-  ks.test.vec.tot[i] = round(testUniformity((simulateResiduals(list.lm.totale[[i]])),plot =F)$p.value,2)
-  sw.test.vec.tot[i] = round(shapiro.test(residuals(list.lm.totale[[i]]))$p.value,2)
-  bp.test.vec.tot[i] = round(bptest(list.lm.totale[[i]])$p.value,2)
-   a.vec.tot[i] <- round(list.lm.totale[[i]]$coefficients[1],2)
-  b.vec.tot[i] <- round(list.lm.totale[[i]]$coefficients[2],2)
+  bias.abs.vec.tot[i] <- round(mean(unlist(list.pred.tot[i]) - data_drone$dry_biom_tot_kg),2)
+  bias.rel.vec.tot[i] <- round(mean((unlist(list.pred.tot[i]) - data_drone$dry_biom_tot_kg) /
+                                        data_drone$dry_biom_tot_kg)*100,2)
+  MAPE.vec.tot[i] <- round(mape(data_drone$dry_biom_tot_kg, unlist(list.pred.tot[i]))*100,2)
+  MAE.vec.tot[i] <- round(mae(data_drone$dry_biom_tot_kg, unlist(list.pred.tot[i])), 2)
+  RMSE.vec.tot[i] <- round(rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot[i])), 2)
+  r2.vec.tot[i] <- round(summary(list.lm.tot[[i]])$adj.r.squared,2)
+  AIC.vec.tot[i]<- round(AIC(list.lm.tot[[i]]),2)
+  NRMSE.vec.tot[i] <- round(100*rmse(data_drone$dry_biom_tot_kg, unlist(list.pred.tot[i]))
+                          /mean(data_drone$dry_biom_tot_kg), 2)
+  ks.test.vec.tot[i] = round(testUniformity((simulateResiduals(list.lm.tot[[i]])),plot =F)$p.value,2)
+  sw.test.vec.tot[i] = round(shapiro.test(residuals(list.lm.tot[[i]]))$p.value,2)
+  bp.test.vec.tot[i] = round(bptest(list.lm.tot[[i]])$p.value,2)
+   a.vec.tot[i] <- round(list.lm.tot[[i]]$coefficients[1],2)
+  b.vec.tot[i] <- round(list.lm.tot[[i]]$coefficients[2],2)
   
   if(grepl("log", variables[i])){
-    a.vec.tot[i] <- round(exp(list.lm.totale[[i]]$coefficients[1]),2)
-    cf.vec.tot[i] <- round(exp(0.5*summary(list.lm.totale[[i]])$sigma^2),2)
+    a.vec.tot[i] <- round(exp(list.lm.tot[[i]]$coefficients[1]),2)
+    cf.vec.tot[i] <- round(exp(0.5*summary(list.lm.tot[[i]])$sigma^2),2)
   }
 }
 
-df.results.totale <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+df.results.tot <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
                                     "bias_abs" = bias.abs.vec.tot, "bias_rel" = bias.rel.vec.tot, 
                                     "MAE" = MAE.vec.tot, "MAPE" = MAPE.vec.tot, 
                                     "RMSE" = RMSE.vec.tot, "NRMSE" = NRMSE.vec.tot, 
@@ -764,497 +590,29 @@ df.results.totale <- data.frame("Model" = 1:nb_model, "Variable" = variables,
                                     "CF" = cf.vec.tot)
 
 
-write.csv2(df.results.totale,"modele_biomass_totale_sansoutliers.csv")
+write.csv2(df.results.tot,"data_output/modele_uav_biomass_totale.csv",row.names = FALSE)
 
-kable(df.results.totale,caption = table.caption("Performances des modèles pour la biomasse totale des arbres (sans outliers)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
+kable(df.results.tot,caption = table.caption("Performances des modèles pour la biomasse totale (40 arbres)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
-
-# Modélisation pour chaque traitement
-
-On estime la biomasse sèche totale des arbres en calibrant un modèle par traitement age x fertilisation
-
-Il y a entre 4 et 6 répétition par traitement (6 traitements au total) en incluant les deux outliers
-
-```{r}
-table(data_drone$age,data_drone$fertilizat)
 ```
 
-**Traitement 4 x F**
+### Modèle volume
+
+Pour le volume le Bias absolu, le MAE et RMSE sont multipliés par 1000 pour éviter d'arrondir sur des petites valeurs 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-data_4F = data_drone_wo %>% filter(age == "4",fertilizat == "F")
-
-# SANS OUTLIER
-lm.4F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_4F)
-lm.4F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4F)
-lm.4F.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4F)
-lm.4F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_4F)
-
-lm.4F.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_4F)
-lm.4F.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4F)
-lm.4F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4F)
-lm.4F.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_4F)
-
-list.lm.totale <- list(lm.4F.1, lm.4F.2, lm.4F.3, lm.4F.4, lm.4F.5, lm.4F.6, lm.4F.7, lm.4F.8)
-
-pred.4F.1 <- predict(lm.4F.1)
-pred.4F.2 <- predict(lm.4F.2)
-pred.4F.3 <- predict(lm.4F.3)
-pred.4F.4 <- predict(lm.4F.4)
-
-pred.4F.5 <- exp(predict(lm.4F.5)+mean(lm.4F.5$residuals^2)/2)
-pred.4F.6 <- exp(predict(lm.4F.6)+mean(lm.4F.6$residuals^2)/2)
-pred.4F.7 <- exp(predict(lm.4F.7)+mean(lm.4F.7$residuals^2)/2)
-pred.4F.8 <- exp(predict(lm.4F.8)+mean(lm.4F.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.4F.1, pred.4F.2, pred.4F.3, pred.4F.4, pred.4F.5, pred.4F.6, pred.4F.7, pred.4F.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.4F <- c()
-MAPE.vec.4F <- c()
-MAE.vec.4F <- c()
-NRMSE.vec.4F <- c()
-RMSE.vec.4F <- c()
-r2.vec.4F <- c()
-a.vec.4F <- c()
-b.vec.4F <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.4F[i] <- bias(unlist(list.pred.totale[i]), data_4F$dry_biom_tot_kg)
-  MAPE.vec.4F[i] <- MAPE(unlist(list.pred.totale[i]), data_4F$dry_biom_tot_kg)
-  MAE.vec.4F[i] <- round(MAE(unlist(list.pred.totale[i]), data_4F$dry_biom_tot_kg), 2)
-  RMSE.vec.4F[i] <- round(RMSE(unlist(list.pred.totale[i]), data_4F$dry_biom_tot_kg), 2)
-  r2.vec.4F[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.4F[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_4F$dry_biom_tot_kg)/mean(data_4F$dry_biom_tot_kg), 2)
-  r2.vec.4F[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.4F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.4F[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.4F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.4F[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.4F <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.4F, "MAE" = MAE.vec.4F, "RMSE" = RMSE.vec.4F, "MAPE" = MAPE.vec.4F, "NRMSE" = NRMSE.vec.4F, "r2" = r2.vec.4F, "a" = a.vec.4F, "b" = b.vec.4F)
-
-df.results.4F$r2 <- ifelse(df.results.4F$r2 == max(df.results.4F$r2), paste0("**", df.results.4F$r2, "**"), df.results.4F$r2)
-df.results.4F$NRMSE <- ifelse(df.results.4F$NRMSE == min(df.results.4F$NRMSE), paste0("**", df.results.4F$NRMSE, "**"), df.results.4F$NRMSE)
-
-kable(df.results.4F,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 4 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-**Traitement 4 x NF**
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-data_4NF = data_drone_wo %>% filter(age == "4",fertilizat == "NF")
-
-# SANS OUTLIER
-lm.4NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_4NF)
-lm.4NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4NF)
-lm.4NF.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4NF)
-lm.4NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_4NF)
-
-lm.4NF.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_4NF)
-lm.4NF.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4NF)
-lm.4NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4NF)
-lm.4NF.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_4NF)
-
-list.lm.totale <- list(lm.4NF.1, lm.4NF.2, lm.4NF.3, lm.4NF.4, lm.4NF.5, lm.4NF.6, lm.4NF.7, lm.4NF.8)
-
-pred.4NF.1 <- predict(lm.4NF.1)
-pred.4NF.2 <- predict(lm.4NF.2)
-pred.4NF.3 <- predict(lm.4NF.3)
-pred.4NF.4 <- predict(lm.4NF.4)
-
-pred.4NF.5 <- exp(predict(lm.4NF.5)+mean(lm.4NF.5$residuals^2)/2)
-pred.4NF.6 <- exp(predict(lm.4NF.6)+mean(lm.4NF.6$residuals^2)/2)
-pred.4NF.7 <- exp(predict(lm.4NF.7)+mean(lm.4NF.7$residuals^2)/2)
-pred.4NF.8 <- exp(predict(lm.4NF.8)+mean(lm.4NF.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.4NF.1, pred.4NF.2, pred.4NF.3, pred.4NF.4, pred.4NF.5, pred.4NF.6, pred.4NF.7, pred.4NF.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.4NF <- c()
-MAPE.vec.4NF <- c()
-MAE.vec.4NF <- c()
-NRMSE.vec.4NF <- c()
-RMSE.vec.4NF <- c()
-r2.vec.4NF <- c()
-a.vec.4NF <- c()
-b.vec.4NF <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.4NF[i] <- bias(unlist(list.pred.totale[i]), data_4NF$dry_biom_tot_kg)
-  MAPE.vec.4NF[i] <- MAPE(unlist(list.pred.totale[i]), data_4NF$dry_biom_tot_kg)
-  MAE.vec.4NF[i] <- round(MAE(unlist(list.pred.totale[i]), data_4NF$dry_biom_tot_kg), 2)
-  RMSE.vec.4NF[i] <- round(RMSE(unlist(list.pred.totale[i]), data_4NF$dry_biom_tot_kg), 2)
-  r2.vec.4NF[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.4NF[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_4NF$dry_biom_tot_kg)/mean(data_4NF$dry_biom_tot_kg), 2)
-  r2.vec.4NF[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.4NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.4NF[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.4NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.4NF[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.4NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.4NF, "MAE" = MAE.vec.4NF, "RMSE" = RMSE.vec.4NF, "MAPE" = MAPE.vec.4NF, "NRMSE" = NRMSE.vec.4NF, "r2" = r2.vec.4NF, "a" = a.vec.4NF, "b" = b.vec.4NF)
-
-df.results.4NF$r2 <- ifelse(df.results.4NF$r2 == max(df.results.4NF$r2), paste0("**", df.results.4NF$r2, "**"), df.results.4NF$r2)
-df.results.4NF$NRMSE <- ifelse(df.results.4NF$NRMSE == min(df.results.4NF$NRMSE), paste0("**", df.results.4NF$NRMSE, "**"), df.results.4NF$NRMSE)
-
-kable(df.results.4NF,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 4 x NF"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-**Traitement 5 x F**
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-data_5F = data_drone_wo %>% filter(age == "5",fertilizat == "F")
-
-# SANS OUTLIER
-lm.5F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_5F)
-lm.5F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5F)
-lm.5F.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5F)
-lm.5F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_5F)
-
-lm.5F.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_5F)
-lm.5F.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5F)
-lm.5F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5F)
-lm.5F.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_5F)
-
-list.lm.totale <- list(lm.5F.1, lm.5F.2, lm.5F.3, lm.5F.4, lm.5F.5, lm.5F.6, lm.5F.7, lm.5F.8)
-
-pred.5F.1 <- predict(lm.5F.1)
-pred.5F.2 <- predict(lm.5F.2)
-pred.5F.3 <- predict(lm.5F.3)
-pred.5F.4 <- predict(lm.5F.4)
-
-pred.5F.5 <- exp(predict(lm.5F.5)+mean(lm.5F.5$residuals^2)/2)
-pred.5F.6 <- exp(predict(lm.5F.6)+mean(lm.5F.6$residuals^2)/2)
-pred.5F.7 <- exp(predict(lm.5F.7)+mean(lm.5F.7$residuals^2)/2)
-pred.5F.8 <- exp(predict(lm.5F.8)+mean(lm.5F.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.5F.1, pred.5F.2, pred.5F.3, pred.5F.4, pred.5F.5, pred.5F.6, pred.5F.7, pred.5F.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.5F <- c()
-MAPE.vec.5F <- c()
-MAE.vec.5F <- c()
-NRMSE.vec.5F <- c()
-RMSE.vec.5F <- c()
-r2.vec.5F <- c()
-a.vec.5F <- c()
-b.vec.5F <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.5F[i] <- bias(unlist(list.pred.totale[i]), data_5F$dry_biom_tot_kg)
-  MAPE.vec.5F[i] <- MAPE(unlist(list.pred.totale[i]), data_5F$dry_biom_tot_kg)
-  MAE.vec.5F[i] <- round(MAE(unlist(list.pred.totale[i]), data_5F$dry_biom_tot_kg), 2)
-  RMSE.vec.5F[i] <- round(RMSE(unlist(list.pred.totale[i]), data_5F$dry_biom_tot_kg), 2)
-  r2.vec.5F[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.5F[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_5F$dry_biom_tot_kg)/mean(data_5F$dry_biom_tot_kg), 2)
-  r2.vec.5F[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.5F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.5F[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.5F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.5F[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.5F <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.5F, "MAE" = MAE.vec.5F, "RMSE" = RMSE.vec.5F, "MAPE" = MAPE.vec.5F, "NRMSE" = NRMSE.vec.5F, "r2" = r2.vec.5F, "a" = a.vec.5F, "b" = b.vec.5F)
-
-df.results.5F$r2 <- ifelse(df.results.5F$r2 == max(df.results.5F$r2), paste0("**", df.results.5F$r2, "**"), df.results.5F$r2)
-df.results.5F$NRMSE <- ifelse(df.results.5F$NRMSE == min(df.results.5F$NRMSE), paste0("**", df.results.5F$NRMSE, "**"), df.results.5F$NRMSE)
-
-kable(df.results.5F,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 5 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-**Traitement 5 x NF**
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-data_5NF = data_drone_wo %>% filter(age == "5",fertilizat == "NF")
-
-# SANS OUTLIER
-lm.5NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_5NF)
-lm.5NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5NF)
-lm.5NF.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5NF)
-lm.5NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_5NF)
-
-lm.5NF.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_5NF)
-lm.5NF.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5NF)
-lm.5NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5NF)
-lm.5NF.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_5NF)
-
-list.lm.totale <- list(lm.5NF.1, lm.5NF.2, lm.5NF.3, lm.5NF.4, lm.5NF.5, lm.5NF.6, lm.5NF.7, lm.5NF.8)
-
-pred.5NF.1 <- predict(lm.5NF.1)
-pred.5NF.2 <- predict(lm.5NF.2)
-pred.5NF.3 <- predict(lm.5NF.3)
-pred.5NF.4 <- predict(lm.5NF.4)
-
-pred.5NF.5 <- exp(predict(lm.5NF.5)+mean(lm.5NF.5$residuals^2)/2)
-pred.5NF.6 <- exp(predict(lm.5NF.6)+mean(lm.5NF.6$residuals^2)/2)
-pred.5NF.7 <- exp(predict(lm.5NF.7)+mean(lm.5NF.7$residuals^2)/2)
-pred.5NF.8 <- exp(predict(lm.5NF.8)+mean(lm.5NF.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.5NF.1, pred.5NF.2, pred.5NF.3, pred.5NF.4, pred.5NF.5, pred.5NF.6, pred.5NF.7, pred.5NF.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.5NF <- c()
-MAPE.vec.5NF <- c()
-MAE.vec.5NF <- c()
-NRMSE.vec.5NF <- c()
-RMSE.vec.5NF <- c()
-r2.vec.5NF <- c()
-a.vec.5NF <- c()
-b.vec.5NF <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.5NF[i] <- bias(unlist(list.pred.totale[i]), data_5NF$dry_biom_tot_kg)
-  MAPE.vec.5NF[i] <- MAPE(unlist(list.pred.totale[i]), data_5NF$dry_biom_tot_kg)
-  MAE.vec.5NF[i] <- round(MAE(unlist(list.pred.totale[i]), data_5NF$dry_biom_tot_kg), 2)
-  RMSE.vec.5NF[i] <- round(RMSE(unlist(list.pred.totale[i]), data_5NF$dry_biom_tot_kg), 2)
-  r2.vec.5NF[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.5NF[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_5NF$dry_biom_tot_kg)/mean(data_5NF$dry_biom_tot_kg), 2)
-  r2.vec.5NF[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.5NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.5NF[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.5NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.5NF[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.5NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.5NF, "MAE" = MAE.vec.5NF, "RMSE" = RMSE.vec.5NF, "MAPE" = MAPE.vec.5NF, "NRMSE" = NRMSE.vec.5NF, "r2" = r2.vec.5NF, "a" = a.vec.5NF, "b" = b.vec.5NF)
-
-df.results.5NF$r2 <- ifelse(df.results.5NF$r2 == max(df.results.5NF$r2), paste0("**", df.results.5NF$r2, "**"), df.results.5NF$r2)
-df.results.5NF$NRMSE <- ifelse(df.results.5NF$NRMSE == min(df.results.5NF$NRMSE), paste0("**", df.results.5NF$NRMSE, "**"), df.results.5NF$NRMSE)
-
-kable(df.results.5NF,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 5 x NF"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-**Traitement 6 x F**
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-
-data_6F = data_drone_wo %>% filter(age == "6",fertilizat == "F")
-
-# SANS OUTLIER
-lm.6F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_6F)
-lm.6F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6F)
-lm.6F.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6F)
-lm.6F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_6F)
-
-lm.6F.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_6F)
-lm.6F.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6F)
-lm.6F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6F)
-lm.6F.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_6F)
-
-list.lm.totale <- list(lm.6F.1, lm.6F.2, lm.6F.3, lm.6F.4, lm.6F.5, lm.6F.6, lm.6F.7, lm.6F.8)
-
-pred.6F.1 <- predict(lm.6F.1)
-pred.6F.2 <- predict(lm.6F.2)
-pred.6F.3 <- predict(lm.6F.3)
-pred.6F.4 <- predict(lm.6F.4)
-
-pred.6F.5 <- exp(predict(lm.6F.5)+mean(lm.6F.5$residuals^2)/2)
-pred.6F.6 <- exp(predict(lm.6F.6)+mean(lm.6F.6$residuals^2)/2)
-pred.6F.7 <- exp(predict(lm.6F.7)+mean(lm.6F.7$residuals^2)/2)
-pred.6F.8 <- exp(predict(lm.6F.8)+mean(lm.6F.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.6F.1, pred.6F.2, pred.6F.3, pred.6F.4, pred.6F.5, pred.6F.6, pred.6F.7, pred.6F.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.6F <- c()
-MAPE.vec.6F <- c()
-MAE.vec.6F <- c()
-NRMSE.vec.6F <- c()
-RMSE.vec.6F <- c()
-r2.vec.6F <- c()
-a.vec.6F <- c()
-b.vec.6F <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.6F[i] <- bias(unlist(list.pred.totale[i]), data_6F$dry_biom_tot_kg)
-  MAPE.vec.6F[i] <- MAPE(unlist(list.pred.totale[i]), data_6F$dry_biom_tot_kg)
-  MAE.vec.6F[i] <- round(MAE(unlist(list.pred.totale[i]), data_6F$dry_biom_tot_kg), 2)
-  RMSE.vec.6F[i] <- round(RMSE(unlist(list.pred.totale[i]), data_6F$dry_biom_tot_kg), 2)
-  r2.vec.6F[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.6F[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_6F$dry_biom_tot_kg)/mean(data_6F$dry_biom_tot_kg), 2)
-  r2.vec.6F[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.6F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.6F[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.6F[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.6F[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.6F <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.6F, "MAE" = MAE.vec.6F, "RMSE" = RMSE.vec.6F, "MAPE" = MAPE.vec.6F, "NRMSE" = NRMSE.vec.6F, "r2" = r2.vec.6F, "a" = a.vec.6F, "b" = b.vec.6F)
-
-df.results.6F$r2 <- ifelse(df.results.6F$r2 == max(df.results.6F$r2), paste0("**", df.results.6F$r2, "**"), df.results.6F$r2)
-df.results.6F$NRMSE <- ifelse(df.results.6F$NRMSE == min(df.results.6F$NRMSE), paste0("**", df.results.6F$NRMSE, "**"), df.results.6F$NRMSE)
-
-kable(df.results.6F,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 6 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-**Traitement 6 x NF**
-
-```{r echo=FALSE, message=FALSE, warning=FALSE}
-data_6NF = data_drone_wo %>% filter(age == "6",fertilizat == "NF")
-
-# SANS OUTLIER
-lm.6NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_6NF)
-lm.6NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6NF)
-lm.6NF.3 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6NF)
-lm.6NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_6NF)
-
-lm.6NF.5 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_6NF)
-lm.6NF.6 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6NF)
-lm.6NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6NF)
-lm.6NF.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_6NF)
-
-list.lm.totale <- list(lm.6NF.1, lm.6NF.2, lm.6NF.3, lm.6NF.4, lm.6NF.5, lm.6NF.6, lm.6NF.7, lm.6NF.8)
-
-pred.6NF.1 <- predict(lm.6NF.1)
-pred.6NF.2 <- predict(lm.6NF.2)
-pred.6NF.3 <- predict(lm.6NF.3)
-pred.6NF.4 <- predict(lm.6NF.4)
-
-pred.6NF.5 <- exp(predict(lm.6NF.5)+mean(lm.6NF.5$residuals^2)/2)
-pred.6NF.6 <- exp(predict(lm.6NF.6)+mean(lm.6NF.6$residuals^2)/2)
-pred.6NF.7 <- exp(predict(lm.6NF.7)+mean(lm.6NF.7$residuals^2)/2)
-pred.6NF.8 <- exp(predict(lm.6NF.8)+mean(lm.6NF.8$residuals^2)/2)
-
-list.pred.totale <- list(pred.6NF.1, pred.6NF.2, pred.6NF.3, pred.6NF.4, pred.6NF.5, pred.6NF.6, pred.6NF.7, pred.6NF.8)
-
-nb_model <- length(list.lm.totale)
-nb_values <- length(list.pred.totale[[1]])
-  
-```
-
-```{r, echo=FALSE}
-bias.vec.6NF <- c()
-MAPE.vec.6NF <- c()
-MAE.vec.6NF <- c()
-NRMSE.vec.6NF <- c()
-RMSE.vec.6NF <- c()
-r2.vec.6NF <- c()
-a.vec.6NF <- c()
-b.vec.6NF <- c()
-variables <- c("H_drone", "S_drone", "V_drone", "VS_drone", "H_drone.log", "S_drone.log", "V_drone.log", "VS_drone.log")
-
-for (i in 1:nb_model){
-  bias.vec.6NF[i] <- bias(unlist(list.pred.totale[i]), data_6NF$dry_biom_tot_kg)
-  MAPE.vec.6NF[i] <- MAPE(unlist(list.pred.totale[i]), data_6NF$dry_biom_tot_kg)
-  MAE.vec.6NF[i] <- round(MAE(unlist(list.pred.totale[i]), data_6NF$dry_biom_tot_kg), 2)
-  RMSE.vec.6NF[i] <- round(RMSE(unlist(list.pred.totale[i]), data_6NF$dry_biom_tot_kg), 2)
-  r2.vec.6NF[i] <- r2(list.lm.totale[[i]])
-  NRMSE.vec.6NF[i] <- round(100*RMSE(unlist(list.pred.totale[i]), data_6NF$dry_biom_tot_kg)/mean(data_6NF$dry_biom_tot_kg), 2)
-  r2.vec.6NF[i] <- r2(list.lm.totale[[i]])
-}
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.6NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.6NF[i] <- exp(list.lm.totale[[i]]$coefficients[1])
-  }
-  else {
-    a.vec.6NF[i] <- list.lm.totale[[i]]$coefficients[2]
-    b.vec.6NF[i] <- list.lm.totale[[i]]$coefficients[1]
-  } 
- }
-
-
-df.results.6NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.6NF, "MAE" = MAE.vec.6NF, "RMSE" = RMSE.vec.6NF, "MAPE" = MAPE.vec.6NF, "NRMSE" = NRMSE.vec.6NF, "r2" = r2.vec.6NF, "a" = a.vec.6NF, "b" = b.vec.6NF)
-
-df.results.6NF$r2 <- ifelse(df.results.6NF$r2 == max(df.results.6NF$r2), paste0("**", df.results.6NF$r2, "**"), df.results.6NF$r2)
-df.results.6NF$NRMSE <- ifelse(df.results.6NF$NRMSE == min(df.results.6NF$NRMSE), paste0("**", df.results.6NF$NRMSE, "**"), df.results.6NF$NRMSE)
-
-kable(df.results.6NF,caption = table.caption("Tableau des performances des modèles pour la biomasse totale des arbres - TRAITEMENT 6 x NF"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
-```   
-
-
-Par traitement, les modèles drones performent aussi bien voir mieux pour estimer la biomasse totale des arbres on obtient des modèles aussi bon à meilleurs sauf pour le traitement 4-NF. Ceci est dû au modèle 3D dans cette zone qui est mal construit du fait qu'une partie de la parcelle soit recouverte de hautes herbes. 
-
-
-# Modélisation des volumes d'arbre (cubage) par les variables drones
-
-
-```{r eval=FALSE, message=FALSE, warning=FALSE}
-
-lm.vol.1 <- lm(VSMALIAN_av_ec_m3 ~ X_max, data=data_drone_wo)
-lm.vol.2 <- lm(VSMALIAN_av_ec_m3 ~ DSM_area, data=data_drone_wo)
-lm.vol.3 <- lm(VSMALIAN_av_ec_m3 ~ DSM_volume, data=data_drone_wo)
-lm.vol.4 <- lm(VSMALIAN_av_ec_m3 ~ X_volume_area, data=data_drone_wo)
-lm.vol.5 <- lm(VSMALIAN_av_ec_m3 ~ cyl_volume,data = data_drone_wo)
-
-lm.vol.6 <- lm(log(VSMALIAN_av_ec_m3)~log(X_max), data=data_drone_wo)
-lm.vol.7 <- lm(log(VSMALIAN_av_ec_m3)~log(DSM_area), data=data_drone_wo)
-lm.vol.8 <- lm(log(VSMALIAN_av_ec_m3)~log(DSM_volume), data=data_drone_wo)
-lm.vol.9 <- lm(log(VSMALIAN_av_ec_m3)~log(X_volume_area), data=data_drone_wo)
-lm.vol.10 <- lm(log(VSMALIAN_av_ec_m3)~log(cyl_volume), data=data_drone_wo)
+lm.vol.1 <- lm(VSMALIAN_av_ec_m3 ~ X_max, data=data_drone)
+lm.vol.2 <- lm(VSMALIAN_av_ec_m3 ~ DSM_area, data=data_drone)
+lm.vol.3 <- lm(VSMALIAN_av_ec_m3 ~ DSM_volume, data=data_drone)
+lm.vol.4 <- lm(VSMALIAN_av_ec_m3 ~ X_volume_area, data=data_drone)
+lm.vol.5 <- lm(VSMALIAN_av_ec_m3 ~ cyl_volume,data = data_drone)
+
+lm.vol.6 <- lm(log(VSMALIAN_av_ec_m3)~log(X_max), data=data_drone)
+lm.vol.7 <- lm(log(VSMALIAN_av_ec_m3)~log(DSM_area), data=data_drone)
+lm.vol.8 <- lm(log(VSMALIAN_av_ec_m3)~log(DSM_volume), data=data_drone)
+lm.vol.9 <- lm(log(VSMALIAN_av_ec_m3)~log(X_volume_area), data=data_drone)
+lm.vol.10 <- lm(log(VSMALIAN_av_ec_m3)~log(cyl_volume), data=data_drone)
 
 list.lm.volume <- list(lm.vol.1, lm.vol.2, lm.vol.3, lm.vol.4, lm.vol.5, lm.vol.6, lm.vol.7, lm.vol.8,lm.vol.9,lm.vol.10)
 
@@ -1264,224 +622,771 @@ pred.vol.3 <- predict(lm.vol.3)
 pred.vol.4 <- predict(lm.vol.4)
 pred.vol.5 <- predict(lm.vol.5)
 
-pred.vol.6 <- exp(predict(lm.vol.6)+mean(lm.vol.6$residuals^2)/2)
-pred.vol.7 <- exp(predict(lm.vol.7)+mean(lm.vol.7$residuals^2)/2)
-pred.vol.8 <- exp(predict(lm.vol.8)+mean(lm.vol.8$residuals^2)/2)
-pred.vol.9 <- exp(predict(lm.vol.9)+mean(lm.vol.9$residuals^2)/2)
-pred.vol.10 <- exp(predict(lm.vol.10)+mean(lm.vol.10$residuals^2)/2)
+pred.vol.6 <- exp(predict(lm.vol.6)+0.5*summary(lm.vol.6)$sigma^2)
+pred.vol.7 <- exp(predict(lm.vol.7)+0.5*summary(lm.vol.7)$sigma^2)
+pred.vol.8 <- exp(predict(lm.vol.8)+0.5*summary(lm.vol.8)$sigma^2)
+pred.vol.9 <- exp(predict(lm.vol.9)+0.5*summary(lm.vol.9)$sigma^2)
+pred.vol.10 <- exp(predict(lm.vol.10)+0.5*summary(lm.vol.10)$sigma^2)
 
 list.pred.volume <- list(pred.vol.1, pred.vol.2, pred.vol.3, pred.vol.4, pred.vol.5, pred.vol.6, pred.vol.7, pred.vol.8, pred.vol.9, pred.vol.10)
 
 nb_model <- length(list.pred.volume)
 nb_values <- length(list.pred.volume[[1]])
 
-bias.vec.vol <- c()
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+bias.abs.vec.vol <- c()
+bias.rel.vec.vol <- c()
 MAPE.vec.vol <- c()
 MAE.vec.vol <- c()
 NRMSE.vec.vol <- c()
 RMSE.vec.vol <- c()
 r2.vec.vol <- c()
+AIC.vec.vol <- c()
+ks.test.vec.vol <- c()
+sw.test.vec.vol <- c()
+bp.test.vec.vol <- c()
 a.vec.vol <- c()
 b.vec.vol <- c()
-shapiro.vec.vol <- c()
+cf.vec.vol <- c()
+
 variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
                "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
 
+
 for (i in 1:nb_model){
-  bias.vec.vol[i] <- bias(unlist(list.pred.volume[i]), data_drone_wo$VSMALIAN_av_ec_m3)
-  MAPE.vec.vol[i] <- MAPE(unlist(list.pred.volume[i]), data_drone_wo$VSMALIAN_av_ec_m3)
-  MAE.vec.vol[i] <- round(MAE(unlist(list.pred.volume[i]), data_drone_wo$VSMALIAN_av_ec_m3), 2)
-  RMSE.vec.vol[i] <- round(RMSE(unlist(list.pred.volume[i]), data_drone_wo$VSMALIAN_av_ec_m3), 2)
-  r2.vec.vol[i] <- r2(list.lm.volume[[i]])
-  NRMSE.vec.vol[i] <- round(100*RMSE(unlist(list.pred.volume[i]), data_drone_wo$VSMALIAN_av_ec_m3)/mean(data_drone_wo$VSMALIAN_av_ec_m3), 2)
-  shapiro.vec.f[i] <- round(shapiro.test(list.lm.volume[[i]]$residuals)$p.value,2)
+  bias.abs.vec.vol[i] <- round(mean(unlist(list.pred.volume[i]) - data_drone$VSMALIAN_av_ec_m3)*1000,2)
+  bias.rel.vec.vol[i] <- round(mean((unlist(list.pred.volume[i]) - data_drone$VSMALIAN_av_ec_m3) /
+                                        data_drone$VSMALIAN_av_ec_m3)*100,2)
+  MAPE.vec.vol[i] <- round(mape(data_drone$VSMALIAN_av_ec_m3, unlist(list.pred.volume[i]))*100,2)
+  MAE.vec.vol[i] <- round(mae(data_drone$VSMALIAN_av_ec_m3, unlist(list.pred.volume[i]))*1000, 2)
+  RMSE.vec.vol[i] <- round(rmse(data_drone$VSMALIAN_av_ec_m3, unlist(list.pred.volume[i]))*1000, 2)
+  r2.vec.vol[i] <- round(summary(list.lm.volume[[i]])$adj.r.squared,2)
+  AIC.vec.vol[i]<- round(AIC(list.lm.volume[[i]]),2)
+  NRMSE.vec.vol[i] <- round(100*rmse(data_drone$VSMALIAN_av_ec_m3, unlist(list.pred.volume[i]))
+                          /mean(data_drone$VSMALIAN_av_ec_m3), 2)
+  ks.test.vec.vol[i] = round(testUniformity((simulateResiduals(list.lm.volume[[i]])),plot =F)$p.value,2)
+  sw.test.vec.vol[i] = round(shapiro.test(residuals(list.lm.volume[[i]]))$p.value,2)
+  bp.test.vec.vol[i] = round(bptest(list.lm.volume[[i]])$p.value,2)
+   a.vec.vol[i] <- round(list.lm.volume[[i]]$coefficients[1],2)
+  b.vec.vol[i] <- round(list.lm.volume[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.vol[i] <- round(exp(list.lm.volume[[i]]$coefficients[1]),2)
+    cf.vec.vol[i] <- round(exp(0.5*summary(list.lm.volume[[i]])$sigma^2),2)
+  }
 }
-for (i in 1:nb_model){
-  if (grepl("log", variables[i])){
-    a.vec.vol[i] <- round(list.lm.volume[[i]]$coefficients[2],2)
-    b.vec.vol[i] <- round(exp(list.lm.volume[[i]]$coefficients[1]),2)
- }
-  else {
-    a.vec.vol[i] <- round(list.lm.volume[[i]]$coefficients[2],2)
-    b.vec.vol[i] <- round(list.lm.volume[[i]]$coefficients[1],2)
- } 
-}
 
+df.results.volume <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.vol, "bias_rel" = bias.rel.vec.vol, 
+                                    "MAE" = MAE.vec.vol, "MAPE" = MAPE.vec.vol, 
+                                    "RMSE" = RMSE.vec.vol, "NRMSE" = NRMSE.vec.vol, 
+                                    "r2" = r2.vec.vol,"AIC" = AIC.vec.vol,
+                                    "KS" = ks.test.vec.vol, "SW" = sw.test.vec.vol,
+                                    "BP" = bp.test.vec.vol,
+                                    "a" = a.vec.vol, "b" = b.vec.vol, 
+                                    "CF" = cf.vec.vol)
 
-df.results.volume <- data.frame("Model" = 1:nb_model, "Variable" = variables, "Bias" = bias.vec.b, "MAE" = MAE.vec.b, "RMSE" = RMSE.vec.b, "MAPE" = MAPE.vec.b, "NRMSE" = NRMSE.vec.b, "r2" = r2.vec.b,"shapiro" = shapiro.vec.f, "a" = a.vec.b, "b" = b.vec.b)
-
-write.csv2(df.results.volume,"modele_volume.csv")
+write.csv2(df.results.volume,"data_output/modele_uav_volume.csv",row.names = FALSE)
 
 kable(df.results.volume,
-      caption = table.caption("Performances des modèles pour la biomasse des branches"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+      caption = table.caption("Performances des modèles pour le volume (40 arbres)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 ```
   
+
+# Modélisation de la biomasse totale par drone pour chaque traitement
+
+On estime la biomasse sèche totale des arbres en calibrant un modèle dron par traitement age x fertilisation
+
+**Il y a entre 5 et 8 répétitions par traitement (6 traitements au total)**
+
+Les sorties des modèles ne sont pas sauvegardé
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+table(data_drone$age,data_drone$ferti)
+```
+
+## Traitement 4 x F
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_4F = data_drone %>% filter(age == "4",ferti == "F")
+
+lm.4F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_4F)
+lm.4F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4F)
+lm.4F.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_4F)
+lm.4F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_4F)
+lm.4F.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_4F)
+
+lm.4F.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_4F)
+lm.4F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4F)
+lm.4F.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_4F)
+lm.4F.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_4F)
+lm.4F.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_4F)
+
+
+list.lm.4F <- list(lm.4F.1, lm.4F.2, lm.4F.3, lm.4F.4, lm.4F.5, 
+                       lm.4F.6, lm.4F.7, lm.4F.8, lm.4F.9, lm.4F.10)
+
+pred.4F.1 <- predict(lm.4F.1)
+pred.4F.2 <- predict(lm.4F.2)
+pred.4F.3 <- predict(lm.4F.3)
+pred.4F.4 <- predict(lm.4F.4)
+pred.4F.5 <- predict(lm.4F.5)
+
+pred.4F.6 <- exp(predict(lm.4F.6)+0.5*summary(lm.4F.6)$sigma^2)
+pred.4F.7 <- exp(predict(lm.4F.7)+0.5*summary(lm.4F.7)$sigma^2)
+pred.4F.8 <- exp(predict(lm.4F.8)+0.5*summary(lm.4F.8)$sigma^2)
+pred.4F.9 <- exp(predict(lm.4F.9)+0.5*summary(lm.4F.9)$sigma^2)
+pred.4F.10 <- exp(predict(lm.4F.10)+0.5*summary(lm.4F.10)$sigma^2)
+
+list.pred.4F <- list(pred.4F.1, pred.4F.2, pred.4F.3, pred.4F.4, pred.4F.5, 
+                         pred.4F.6, pred.4F.7, pred.4F.8, pred.4F.9, pred.4F.10)
+
+nb_model <- length(list.lm.4F)
+nb_values <- length(list.pred.4F[[1]])
+  
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.4F <- c()
+bias.rel.vec.4F <- c()
+MAPE.vec.4F <- c()
+MAE.vec.4F <- c()
+NRMSE.vec.4F <- c()
+RMSE.vec.4F <- c()
+r2.vec.4F <- c()
+AIC.vec.4F <- c()
+ks.test.vec.4F <- c()
+sw.test.vec.4F <- c()
+bp.test.vec.4F <- c()
+a.vec.4F <- c()
+b.vec.4F <- c()
+cf.vec.4F <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.4F[i] <- round(mean(unlist(list.pred.4F[i]) - data_4F$dry_biom_tot_kg),2)
+  bias.rel.vec.4F[i] <- round(mean((unlist(list.pred.4F[i]) - data_4F$dry_biom_tot_kg) /
+                                        data_4F$dry_biom_tot_kg)*100,2)
+  MAPE.vec.4F[i] <- round(mape(data_4F$dry_biom_tot_kg, unlist(list.pred.4F[i]))*100,2)
+  MAE.vec.4F[i] <- round(mae(data_4F$dry_biom_tot_kg, unlist(list.pred.4F[i])), 2)
+  RMSE.vec.4F[i] <- round(rmse(data_4F$dry_biom_tot_kg, unlist(list.pred.4F[i])), 2)
+  r2.vec.4F[i] <- round(summary(list.lm.4F[[i]])$adj.r.squared,2)
+  AIC.vec.4F[i]<- round(AIC(list.lm.4F[[i]]),2)
+  NRMSE.vec.4F[i] <- round(100*rmse(data_4F$dry_biom_tot_kg, unlist(list.pred.4F[i]))
+                          /mean(data_4F$dry_biom_tot_kg), 2)
+  ks.test.vec.4F[i] = round(testUniformity((simulateResiduals(list.lm.4F[[i]])),plot =F)$p.value,2)
+  sw.test.vec.4F[i] = round(shapiro.test(residuals(list.lm.4F[[i]]))$p.value,2)
+  bp.test.vec.4F[i] = round(bptest(list.lm.4F[[i]])$p.value,2)
+   a.vec.4F[i] <- round(list.lm.4F[[i]]$coefficients[1],2)
+  b.vec.4F[i] <- round(list.lm.4F[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.4F[i] <- round(exp(list.lm.4F[[i]]$coefficients[1]),2)
+    cf.vec.4F[i] <- round(exp(0.5*summary(list.lm.4F[[i]])$sigma^2),2)
+  }
+}
+
+df.results.4F <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.4F, "bias_rel" = bias.rel.vec.4F, 
+                                    "MAE" = MAE.vec.4F, "MAPE" = MAPE.vec.4F, 
+                                    "RMSE" = RMSE.vec.4F, "NRMSE" = NRMSE.vec.4F, 
+                                    "r2" = r2.vec.4F,"AIC" = AIC.vec.4F,
+                                    "KS" = ks.test.vec.4F, "SW" = sw.test.vec.4F,
+                                    "BP" = bp.test.vec.4F,
+                                    "a" = a.vec.4F, "b" = b.vec.4F, 
+                                    "CF" = cf.vec.4F)
+
+
+kable(df.results.4F,caption = table.caption("¨Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 4 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```   
+
+## Traitement 4 x NF
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_4NF = data_drone %>% filter(age == "4",ferti == "NF")
+
+
+lm.4NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_4NF)
+lm.4NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_4NF)
+lm.4NF.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_4NF)
+lm.4NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_4NF)
+lm.4NF.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_4NF)
+
+lm.4NF.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_4NF)
+lm.4NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_4NF)
+lm.4NF.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_4NF)
+lm.4NF.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_4NF)
+lm.4NF.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_4NF)
+
+
+list.lm.4NF <- list(lm.4NF.1, lm.4NF.2, lm.4NF.3, lm.4NF.4, lm.4NF.5, 
+                       lm.4NF.6, lm.4NF.7, lm.4NF.8, lm.4NF.9, lm.4NF.10)
+
+pred.4NF.1 <- predict(lm.4NF.1)
+pred.4NF.2 <- predict(lm.4NF.2)
+pred.4NF.3 <- predict(lm.4NF.3)
+pred.4NF.4 <- predict(lm.4NF.4)
+pred.4NF.5 <- predict(lm.4NF.5)
+
+pred.4NF.6 <- exp(predict(lm.4NF.6)+0.5*summary(lm.4NF.6)$sigma^2)
+pred.4NF.7 <- exp(predict(lm.4NF.7)+0.5*summary(lm.4NF.7)$sigma^2)
+pred.4NF.8 <- exp(predict(lm.4NF.8)+0.5*summary(lm.4NF.8)$sigma^2)
+pred.4NF.9 <- exp(predict(lm.4NF.9)+0.5*summary(lm.4NF.9)$sigma^2)
+pred.4NF.10 <- exp(predict(lm.4NF.10)+0.5*summary(lm.4NF.10)$sigma^2)
+
+list.pred.4NF <- list(pred.4NF.1, pred.4NF.2, pred.4NF.3, pred.4NF.4, pred.4NF.5, 
+                         pred.4NF.6, pred.4NF.7, pred.4NF.8, pred.4NF.9, pred.4NF.10)
+
+nb_model <- length(list.lm.4NF)
+nb_values <- length(list.pred.4NF[[1]])
+  
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.4NF <- c()
+bias.rel.vec.4NF <- c()
+MAPE.vec.4NF <- c()
+MAE.vec.4NF <- c()
+NRMSE.vec.4NF <- c()
+RMSE.vec.4NF <- c()
+r2.vec.4NF <- c()
+AIC.vec.4NF <- c()
+ks.test.vec.4NF <- c()
+sw.test.vec.4NF <- c()
+bp.test.vec.4NF <- c()
+a.vec.4NF <- c()
+b.vec.4NF <- c()
+cf.vec.4NF <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.4NF[i] <- round(mean(unlist(list.pred.4NF[i]) - data_4NF$dry_biom_tot_kg),2)
+  bias.rel.vec.4NF[i] <- round(mean((unlist(list.pred.4NF[i]) - data_4NF$dry_biom_tot_kg) /
+                                        data_4NF$dry_biom_tot_kg)*100,2)
+  MAPE.vec.4NF[i] <- round(mape(data_4NF$dry_biom_tot_kg, unlist(list.pred.4NF[i]))*100,2)
+  MAE.vec.4NF[i] <- round(mae(data_4NF$dry_biom_tot_kg, unlist(list.pred.4NF[i])), 2)
+  RMSE.vec.4NF[i] <- round(rmse(data_4NF$dry_biom_tot_kg, unlist(list.pred.4NF[i])), 2)
+  r2.vec.4NF[i] <- round(summary(list.lm.4NF[[i]])$adj.r.squared,2)
+  AIC.vec.4NF[i]<- round(AIC(list.lm.4NF[[i]]),2)
+  NRMSE.vec.4NF[i] <- round(100*rmse(data_4NF$dry_biom_tot_kg, unlist(list.pred.4NF[i]))
+                          /mean(data_4NF$dry_biom_tot_kg), 2)
+  ks.test.vec.4NF[i] = round(testUniformity((simulateResiduals(list.lm.4NF[[i]])),plot =F)$p.value,2)
+  sw.test.vec.4NF[i] = round(shapiro.test(residuals(list.lm.4NF[[i]]))$p.value,2)
+  bp.test.vec.4NF[i] = round(bptest(list.lm.4NF[[i]])$p.value,2)
+   a.vec.4NF[i] <- round(list.lm.4NF[[i]]$coefficients[1],2)
+  b.vec.4NF[i] <- round(list.lm.4NF[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.4NF[i] <- round(exp(list.lm.4NF[[i]]$coefficients[1]),2)
+    cf.vec.4NF[i] <- round(exp(0.5*summary(list.lm.4NF[[i]])$sigma^2),2)
+  }
+}
+
+
+df.results.4NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.4NF, "bias_rel" = bias.rel.vec.4NF, 
+                                    "MAE" = MAE.vec.4NF, "MAPE" = MAPE.vec.4NF, 
+                                    "RMSE" = RMSE.vec.4NF, "NRMSE" = NRMSE.vec.4NF, 
+                                    "r2" = r2.vec.4NF,"AIC" = AIC.vec.4NF,
+                                    "KS" = ks.test.vec.4NF, "SW" = sw.test.vec.4NF,
+                                    "BP" = bp.test.vec.4NF,
+                                    "a" = a.vec.4NF, "b" = b.vec.4NF, 
+                                    "CF" = cf.vec.4NF)
+
+
+
+kable(df.results.4NF,caption = table.caption("Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 4 x NF"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```   
+
+## Traitement 5 x F
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_5F = data_drone %>% filter(age == "5",ferti == "F")
+
+lm.5F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_5F)
+lm.5F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5F)
+lm.5F.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_5F)
+lm.5F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_5F)
+lm.5F.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_5F)
+
+lm.5F.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_5F)
+lm.5F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5F)
+lm.5F.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_5F)
+lm.5F.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_5F)
+lm.5F.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_5F)
+
+
+list.lm.5F <- list(lm.5F.1, lm.5F.2, lm.5F.3, lm.5F.4, lm.5F.5, 
+                       lm.5F.6, lm.5F.7, lm.5F.8, lm.5F.9, lm.5F.10)
+
+pred.5F.1 <- predict(lm.5F.1)
+pred.5F.2 <- predict(lm.5F.2)
+pred.5F.3 <- predict(lm.5F.3)
+pred.5F.4 <- predict(lm.5F.4)
+pred.5F.5 <- predict(lm.5F.5)
+
+pred.5F.6 <- exp(predict(lm.5F.6)+0.5*summary(lm.5F.6)$sigma^2)
+pred.5F.7 <- exp(predict(lm.5F.7)+0.5*summary(lm.5F.7)$sigma^2)
+pred.5F.8 <- exp(predict(lm.5F.8)+0.5*summary(lm.5F.8)$sigma^2)
+pred.5F.9 <- exp(predict(lm.5F.9)+0.5*summary(lm.5F.9)$sigma^2)
+pred.5F.10 <- exp(predict(lm.5F.10)+0.5*summary(lm.5F.10)$sigma^2)
+
+list.pred.5F <- list(pred.5F.1, pred.5F.2, pred.5F.3, pred.5F.4, pred.5F.5, 
+                         pred.5F.6, pred.5F.7, pred.5F.8, pred.5F.9, pred.5F.10)
+
+nb_model <- length(list.lm.5F)
+nb_values <- length(list.pred.5F[[1]])
+  
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.5F <- c()
+bias.rel.vec.5F <- c()
+MAPE.vec.5F <- c()
+MAE.vec.5F <- c()
+NRMSE.vec.5F <- c()
+RMSE.vec.5F <- c()
+r2.vec.5F <- c()
+AIC.vec.5F <- c()
+ks.test.vec.5F <- c()
+sw.test.vec.5F <- c()
+bp.test.vec.5F <- c()
+a.vec.5F <- c()
+b.vec.5F <- c()
+cf.vec.5F <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.5F[i] <- round(mean(unlist(list.pred.5F[i]) - data_5F$dry_biom_tot_kg),2)
+  bias.rel.vec.5F[i] <- round(mean((unlist(list.pred.5F[i]) - data_5F$dry_biom_tot_kg) /
+                                        data_5F$dry_biom_tot_kg)*100,2)
+  MAPE.vec.5F[i] <- round(mape(data_5F$dry_biom_tot_kg, unlist(list.pred.5F[i]))*100,2)
+  MAE.vec.5F[i] <- round(mae(data_5F$dry_biom_tot_kg, unlist(list.pred.5F[i])), 2)
+  RMSE.vec.5F[i] <- round(rmse(data_5F$dry_biom_tot_kg, unlist(list.pred.5F[i])), 2)
+  r2.vec.5F[i] <- round(summary(list.lm.5F[[i]])$adj.r.squared,2)
+  AIC.vec.5F[i]<- round(AIC(list.lm.5F[[i]]),2)
+  NRMSE.vec.5F[i] <- round(100*rmse(data_5F$dry_biom_tot_kg, unlist(list.pred.5F[i]))
+                          /mean(data_5F$dry_biom_tot_kg), 2)
+  ks.test.vec.5F[i] = round(testUniformity((simulateResiduals(list.lm.5F[[i]])),plot =F)$p.value,2)
+  sw.test.vec.5F[i] = round(shapiro.test(residuals(list.lm.5F[[i]]))$p.value,2)
+  bp.test.vec.5F[i] = round(bptest(list.lm.5F[[i]])$p.value,2)
+   a.vec.5F[i] <- round(list.lm.5F[[i]]$coefficients[1],2)
+  b.vec.5F[i] <- round(list.lm.5F[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.5F[i] <- round(exp(list.lm.5F[[i]]$coefficients[1]),2)
+    cf.vec.5F[i] <- round(exp(0.5*summary(list.lm.5F[[i]])$sigma^2),2)
+  }
+}
+
+
+df.results.5F <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.5F, "bias_rel" = bias.rel.vec.5F, 
+                                    "MAE" = MAE.vec.5F, "MAPE" = MAPE.vec.5F, 
+                                    "RMSE" = RMSE.vec.5F, "NRMSE" = NRMSE.vec.5F, 
+                                    "r2" = r2.vec.5F,"AIC" = AIC.vec.5F,
+                                    "KS" = ks.test.vec.5F, "SW" = sw.test.vec.5F,
+                                    "BP" = bp.test.vec.5F,
+                                    "a" = a.vec.5F, "b" = b.vec.5F, 
+                                    "CF" = cf.vec.5F)
+
+
+kable(df.results.5F,caption = table.caption("Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 5 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```   
+
+## Traitement 5 x NF
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_5NF = data_drone %>% filter(age == "5",ferti == "NF")
+
+lm.5NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_5NF)
+lm.5NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_5NF)
+lm.5NF.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_5NF)
+lm.5NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_5NF)
+lm.5NF.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_5NF)
+
+lm.5NF.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_5NF)
+lm.5NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_5NF)
+lm.5NF.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_5NF)
+lm.5NF.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_5NF)
+lm.5NF.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_5NF)
+
+
+list.lm.5NF <- list(lm.5NF.1, lm.5NF.2, lm.5NF.3, lm.5NF.4, lm.5NF.5, 
+                       lm.5NF.6, lm.5NF.7, lm.5NF.8, lm.5NF.9, lm.5NF.10)
+
+pred.5NF.1 <- predict(lm.5NF.1)
+pred.5NF.2 <- predict(lm.5NF.2)
+pred.5NF.3 <- predict(lm.5NF.3)
+pred.5NF.4 <- predict(lm.5NF.4)
+pred.5NF.5 <- predict(lm.5NF.5)
+
+pred.5NF.6 <- exp(predict(lm.5NF.6)+0.5*summary(lm.5NF.6)$sigma^2)
+pred.5NF.7 <- exp(predict(lm.5NF.7)+0.5*summary(lm.5NF.7)$sigma^2)
+pred.5NF.8 <- exp(predict(lm.5NF.8)+0.5*summary(lm.5NF.8)$sigma^2)
+pred.5NF.9 <- exp(predict(lm.5NF.9)+0.5*summary(lm.5NF.9)$sigma^2)
+pred.5NF.10 <- exp(predict(lm.5NF.10)+0.5*summary(lm.5NF.10)$sigma^2)
+
+list.pred.5NF <- list(pred.5NF.1, pred.5NF.2, pred.5NF.3, pred.5NF.4, pred.5NF.5, 
+                         pred.5NF.6, pred.5NF.7, pred.5NF.8, pred.5NF.9, pred.5NF.10)
+
+nb_model <- length(list.lm.5NF)
+nb_values <- length(list.pred.5NF[[1]])
+  
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.5NF <- c()
+bias.rel.vec.5NF <- c()
+MAPE.vec.5NF <- c()
+MAE.vec.5NF <- c()
+NRMSE.vec.5NF <- c()
+RMSE.vec.5NF <- c()
+r2.vec.5NF <- c()
+AIC.vec.5NF <- c()
+ks.test.vec.5NF <- c()
+sw.test.vec.5NF <- c()
+bp.test.vec.5NF <- c()
+a.vec.5NF <- c()
+b.vec.5NF <- c()
+cf.vec.5NF <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.5NF[i] <- round(mean(unlist(list.pred.5NF[i]) - data_5NF$dry_biom_tot_kg),2)
+  bias.rel.vec.5NF[i] <- round(mean((unlist(list.pred.5NF[i]) - data_5NF$dry_biom_tot_kg) /
+                                        data_5NF$dry_biom_tot_kg)*100,2)
+  MAPE.vec.5NF[i] <- round(mape(data_5NF$dry_biom_tot_kg, unlist(list.pred.5NF[i]))*100,2)
+  MAE.vec.5NF[i] <- round(mae(data_5NF$dry_biom_tot_kg, unlist(list.pred.5NF[i])), 2)
+  RMSE.vec.5NF[i] <- round(rmse(data_5NF$dry_biom_tot_kg, unlist(list.pred.5NF[i])), 2)
+  r2.vec.5NF[i] <- round(summary(list.lm.5NF[[i]])$adj.r.squared,2)
+  AIC.vec.5NF[i]<- round(AIC(list.lm.5NF[[i]]),2)
+  NRMSE.vec.5NF[i] <- round(100*rmse(data_5NF$dry_biom_tot_kg, unlist(list.pred.5NF[i]))
+                          /mean(data_5NF$dry_biom_tot_kg), 2)
+  ks.test.vec.5NF[i] = round(testUniformity((simulateResiduals(list.lm.5NF[[i]])),plot =F)$p.value,2)
+  sw.test.vec.5NF[i] = round(shapiro.test(residuals(list.lm.5NF[[i]]))$p.value,2)
+  bp.test.vec.5NF[i] = round(bptest(list.lm.5NF[[i]])$p.value,2)
+   a.vec.5NF[i] <- round(list.lm.5NF[[i]]$coefficients[1],2)
+  b.vec.5NF[i] <- round(list.lm.5NF[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.5NF[i] <- round(exp(list.lm.5NF[[i]]$coefficients[1]),2)
+    cf.vec.5NF[i] <- round(exp(0.5*summary(list.lm.5NF[[i]])$sigma^2),2)
+  }
+}
+
+
+df.results.5NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.5NF, "bias_rel" = bias.rel.vec.5NF, 
+                                    "MAE" = MAE.vec.5NF, "MAPE" = MAPE.vec.5NF, 
+                                    "RMSE" = RMSE.vec.5NF, "NRMSE" = NRMSE.vec.5NF, 
+                                    "r2" = r2.vec.5NF,"AIC" = AIC.vec.5NF,
+                                    "KS" = ks.test.vec.5NF, "SW" = sw.test.vec.5NF,
+                                    "BP" = bp.test.vec.5NF,
+                                    "a" = a.vec.5NF, "b" = b.vec.5NF, 
+                                    "CF" = cf.vec.5NF)
+
+
+kable(df.results.5NF,caption = table.caption("Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 5 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+
+```   
+
+## Traitement 6 x F
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_6F = data_drone %>% filter(age == "6",ferti == "F")
+
+lm.6F.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_6F)
+lm.6F.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6F)
+lm.6F.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_6F)
+lm.6F.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_6F)
+lm.6F.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_6F)
+
+lm.6F.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_6F)
+lm.6F.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6F)
+lm.6F.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_6F)
+lm.6F.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_6F)
+lm.6F.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_6F)
+
+
+list.lm.6F <- list(lm.6F.1, lm.6F.2, lm.6F.3, lm.6F.4, lm.6F.5, 
+                       lm.6F.6, lm.6F.7, lm.6F.8, lm.6F.9, lm.6F.10)
+
+pred.6F.1 <- predict(lm.6F.1)
+pred.6F.2 <- predict(lm.6F.2)
+pred.6F.3 <- predict(lm.6F.3)
+pred.6F.4 <- predict(lm.6F.4)
+pred.6F.5 <- predict(lm.6F.5)
+
+pred.6F.6 <- exp(predict(lm.6F.6)+0.5*summary(lm.6F.6)$sigma^2)
+pred.6F.7 <- exp(predict(lm.6F.7)+0.5*summary(lm.6F.7)$sigma^2)
+pred.6F.8 <- exp(predict(lm.6F.8)+0.5*summary(lm.6F.8)$sigma^2)
+pred.6F.9 <- exp(predict(lm.6F.9)+0.5*summary(lm.6F.9)$sigma^2)
+pred.6F.10 <- exp(predict(lm.6F.10)+0.5*summary(lm.6F.10)$sigma^2)
+
+list.pred.6F <- list(pred.6F.1, pred.6F.2, pred.6F.3, pred.6F.4, pred.6F.5, 
+                         pred.6F.6, pred.6F.7, pred.6F.8, pred.6F.9, pred.6F.10)
+
+nb_model <- length(list.lm.6F)
+nb_values <- length(list.pred.6F[[1]])
+  
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.6F <- c()
+bias.rel.vec.6F <- c()
+MAPE.vec.6F <- c()
+MAE.vec.6F <- c()
+NRMSE.vec.6F <- c()
+RMSE.vec.6F <- c()
+r2.vec.6F <- c()
+AIC.vec.6F <- c()
+ks.test.vec.6F <- c()
+sw.test.vec.6F <- c()
+bp.test.vec.6F <- c()
+a.vec.6F <- c()
+b.vec.6F <- c()
+cf.vec.6F <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.6F[i] <- round(mean(unlist(list.pred.6F[i]) - data_6F$dry_biom_tot_kg),2)
+  bias.rel.vec.6F[i] <- round(mean((unlist(list.pred.6F[i]) - data_6F$dry_biom_tot_kg) /
+                                        data_6F$dry_biom_tot_kg)*100,2)
+  MAPE.vec.6F[i] <- round(mape(data_6F$dry_biom_tot_kg, unlist(list.pred.6F[i]))*100,2)
+  MAE.vec.6F[i] <- round(mae(data_6F$dry_biom_tot_kg, unlist(list.pred.6F[i])), 2)
+  RMSE.vec.6F[i] <- round(rmse(data_6F$dry_biom_tot_kg, unlist(list.pred.6F[i])), 2)
+  r2.vec.6F[i] <- round(summary(list.lm.6F[[i]])$adj.r.squared,2)
+  AIC.vec.6F[i]<- round(AIC(list.lm.6F[[i]]),2)
+  NRMSE.vec.6F[i] <- round(100*rmse(data_6F$dry_biom_tot_kg, unlist(list.pred.6F[i]))
+                          /mean(data_6F$dry_biom_tot_kg), 2)
+  ks.test.vec.6F[i] = round(testUniformity((simulateResiduals(list.lm.6F[[i]])),plot =F)$p.value,2)
+  sw.test.vec.6F[i] = round(shapiro.test(residuals(list.lm.6F[[i]]))$p.value,2)
+  bp.test.vec.6F[i] = round(bptest(list.lm.6F[[i]])$p.value,2)
+   a.vec.6F[i] <- round(list.lm.6F[[i]]$coefficients[1],2)
+  b.vec.6F[i] <- round(list.lm.6F[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.6F[i] <- round(exp(list.lm.6F[[i]]$coefficients[1]),2)
+    cf.vec.6F[i] <- round(exp(0.5*summary(list.lm.6F[[i]])$sigma^2),2)
+  }
+}
+
+
+df.results.6F <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.6F, "bias_rel" = bias.rel.vec.6F, 
+                                    "MAE" = MAE.vec.6F, "MAPE" = MAPE.vec.6F, 
+                                    "RMSE" = RMSE.vec.6F, "NRMSE" = NRMSE.vec.6F, 
+                                    "r2" = r2.vec.6F,"AIC" = AIC.vec.6F,
+                                    "KS" = ks.test.vec.6F, "SW" = sw.test.vec.6F,
+                                    "BP" = bp.test.vec.6F,
+                                    "a" = a.vec.6F, "b" = b.vec.6F, 
+                                    "CF" = cf.vec.6F)
+
+kable(df.results.6F,caption = table.caption("Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 6 x F"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```   
+
+## Traitement 6 x NF
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data_6NF = data_drone %>% filter(age == "6",ferti == "NF")
+
+lm.6NF.1 <- lm(dry_biom_tot_kg ~ X_max, data=data_6NF)
+lm.6NF.2 <- lm(dry_biom_tot_kg ~ DSM_area, data=data_6NF)
+lm.6NF.3 <- lm(dry_biom_tot_kg ~ DSM_volume, data=data_6NF)
+lm.6NF.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_6NF)
+lm.6NF.5 <- lm(dry_biom_tot_kg ~ cyl_volume,data = data_6NF)
+
+lm.6NF.6 <- lm(log(dry_biom_tot_kg)~log(X_max), data=data_6NF)
+lm.6NF.7 <- lm(log(dry_biom_tot_kg)~log(DSM_area), data=data_6NF)
+lm.6NF.8 <- lm(log(dry_biom_tot_kg)~log(DSM_volume), data=data_6NF)
+lm.6NF.9 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_6NF)
+lm.6NF.10 <- lm(log(dry_biom_tot_kg)~log(cyl_volume), data=data_6NF)
+
+
+list.lm.6NF <- list(lm.6NF.1, lm.6NF.2, lm.6NF.3, lm.6NF.4, lm.6NF.5, 
+                       lm.6NF.6, lm.6NF.7, lm.6NF.8, lm.6NF.9, lm.6NF.10)
+
+pred.6NF.1 <- predict(lm.6NF.1)
+pred.6NF.2 <- predict(lm.6NF.2)
+pred.6NF.3 <- predict(lm.6NF.3)
+pred.6NF.4 <- predict(lm.6NF.4)
+pred.6NF.5 <- predict(lm.6NF.5)
+
+pred.6NF.6 <- exp(predict(lm.6NF.6)+0.5*summary(lm.6NF.6)$sigma^2)
+pred.6NF.7 <- exp(predict(lm.6NF.7)+0.5*summary(lm.6NF.7)$sigma^2)
+pred.6NF.8 <- exp(predict(lm.6NF.8)+0.5*summary(lm.6NF.8)$sigma^2)
+pred.6NF.9 <- exp(predict(lm.6NF.9)+0.5*summary(lm.6NF.9)$sigma^2)
+pred.6NF.10 <- exp(predict(lm.6NF.10)+0.5*summary(lm.6NF.10)$sigma^2)
+
+list.pred.6NF <- list(pred.6NF.1, pred.6NF.2, pred.6NF.3, pred.6NF.4, pred.6NF.5, 
+                         pred.6NF.6, pred.6NF.7, pred.6NF.8, pred.6NF.9, pred.6NF.10)
+
+nb_model <- length(list.lm.6NF)
+nb_values <- length(list.pred.6NF[[1]])
+  
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+bias.abs.vec.6NF <- c()
+bias.rel.vec.6NF <- c()
+MAPE.vec.6NF <- c()
+MAE.vec.6NF <- c()
+NRMSE.vec.6NF <- c()
+RMSE.vec.6NF <- c()
+r2.vec.6NF <- c()
+AIC.vec.6NF <- c()
+ks.test.vec.6NF <- c()
+sw.test.vec.6NF <- c()
+bp.test.vec.6NF <- c()
+a.vec.6NF <- c()
+b.vec.6NF <- c()
+cf.vec.6NF <- c()
+
+variables <- c("H_drone", "DSM_area", "DSM_volume", "Proj_volume", "Cyl_volume",
+               "H_drone.log", "DSM_area.log", "DSM_volume.log", "Proj_volume.log","Cyl_volume.log")
+
+
+for (i in 1:nb_model){
+  bias.abs.vec.6NF[i] <- round(mean(unlist(list.pred.6NF[i]) - data_6NF$dry_biom_tot_kg),2)
+  bias.rel.vec.6NF[i] <- round(mean((unlist(list.pred.6NF[i]) - data_6NF$dry_biom_tot_kg) /
+                                        data_6NF$dry_biom_tot_kg)*100,2)
+  MAPE.vec.6NF[i] <- round(mape(data_6NF$dry_biom_tot_kg, unlist(list.pred.6NF[i]))*100,2)
+  MAE.vec.6NF[i] <- round(mae(data_6NF$dry_biom_tot_kg, unlist(list.pred.6NF[i])), 2)
+  RMSE.vec.6NF[i] <- round(rmse(data_6NF$dry_biom_tot_kg, unlist(list.pred.6NF[i])), 2)
+  r2.vec.6NF[i] <- round(summary(list.lm.6NF[[i]])$adj.r.squared,2)
+  AIC.vec.6NF[i]<- round(AIC(list.lm.6NF[[i]]),2)
+  NRMSE.vec.6NF[i] <- round(100*rmse(data_6NF$dry_biom_tot_kg, unlist(list.pred.6NF[i]))
+                          /mean(data_6NF$dry_biom_tot_kg), 2)
+  ks.test.vec.6NF[i] = round(testUniformity((simulateResiduals(list.lm.6NF[[i]])),plot =F)$p.value,2)
+  sw.test.vec.6NF[i] = round(shapiro.test(residuals(list.lm.6NF[[i]]))$p.value,2)
+  bp.test.vec.6NF[i] = round(bptest(list.lm.6NF[[i]])$p.value,2)
+   a.vec.6NF[i] <- round(list.lm.6NF[[i]]$coefficients[1],2)
+  b.vec.6NF[i] <- round(list.lm.6NF[[i]]$coefficients[2],2)
+  
+  if(grepl("log", variables[i])){
+    a.vec.6NF[i] <- round(exp(list.lm.6NF[[i]]$coefficients[1]),2)
+    cf.vec.6NF[i] <- round(exp(0.5*summary(list.lm.6NF[[i]])$sigma^2),2)
+  }
+}
+
+
+df.results.6NF <- data.frame("Model" = 1:nb_model, "Variable" = variables, 
+                                    "bias_abs" = bias.abs.vec.6NF, "bias_rel" = bias.rel.vec.6NF, 
+                                    "MAE" = MAE.vec.6NF, "MAPE" = MAPE.vec.6NF, 
+                                    "RMSE" = RMSE.vec.6NF, "NRMSE" = NRMSE.vec.6NF, 
+                                    "r2" = r2.vec.6NF,"AIC" = AIC.vec.6NF,
+                                    "KS" = ks.test.vec.6NF, "SW" = sw.test.vec.6NF,
+                                    "BP" = bp.test.vec.6NF,
+                                    "a" = a.vec.6NF, "b" = b.vec.6NF, 
+                                    "CF" = cf.vec.6NF)
+
+kable(df.results.6NF,caption = table.caption("Performances des modèles pour la biomasse totale des arbres - TRAITEMENT 6 x NF"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```   
+
+
+Par traitement, les modèles drones performent aussi bien voir mieux pour estimer la biomasse totale des arbres on obtient des modèles aussi bon à meilleurs sauf pour le traitement 4-NF. Ceci est dû au modèle 3D dans cette zone qui est mal construit du fait qu'une partie de la parcelle soit recouverte de hautes herbes. 
+
 
 
 # Extrapolation à l'échelle des parcelles
 
 Afin d'extrapoler l'estimation de la biomasse à l'échelle des parcelles (ha), on extrait les données drone à l'échelle des parcelles et on utilise les modèles établis à l'échelle de l'arbre extrapoler. 
 
-3 approches : 
+On réalise ces estimations sur les 6 parcelles vitrines (age : 4,5, 6 et F/NF)
+
+Les variables estimées sont : volume, biomasse tronc et biomasse totale
+
+2 approches : 
 
 - Estimation par arbre - modèle drone : on utilise la segmentation données par le drone pour extraire les données de chaque arbre (polygone) puis on applique les modèles drone à l'échelle de l'arbre
 - Estimation par arbre - relation allométrique : on utilise aussi la segmentation pour extraire les données de chaque arbre (polygone) puis on applique utilise les variables drones pour estimer CBH et H en input dans les relation allométriques
-- Estimation d'ensemble : on extrapole les données drone de la parcelle (1 valeur par parcelle) puis on utilise les modèles arbres . A priori cette méthode est simple mais ne devrait pas donner des résultats probant
 
-Les variables mesurées sur le terrain sur chaque parcelles sont les suivantes : 
-
-- area_ha : surface de la parcelle
-- tree_inventory : nombre d'arbres 
-- H_moy_m : hauteur moyenne des arbres en m
-- somme de Gm2: somme de la surface terrière des arbres (m2)
-- G_m2_perha :  somme de Gm2 par hectare
-- somme de GH : somme de (surface terrière * hauteur) des arbres (m3)
-- GH_m3_perha :  somme de GH par hectare
-- Somme de biom_tot_CFMM : biomasse totale des arbres sur la parcelle (corrigée avec le facteur de correction MM) (kg)
-- biom_tot_Mg_perha : biomasse totale des arbres par hectare (t par hectare)
-
-Ici nous tentons d'estimer la biomasse totale par hectare (biom_tot_Mg_perha) à l'aide des modèles drone
+**Les modèles drone ne peuvent être validé qu'à l'echelle de la parcelle car le nombre d'objet détecté par drone ne correspond pas forcément au nombre d'arbre observé sur le terrain**
 
 ## Extrapolation par objet/arbre - modèle drone
 
+Cette approche correspond à la Méthode 1 décrite dans l'article Sarron et al. 2026
+
 Pour cette approche, on extrait sur QGIS les informations raster de chaque objet détecté lors de la phase de segmentation (même procédure que pour les arbres de calibration). Les objets correspondent environ aux arbres mais peuvent également être des morceaux d'arbres ou des arbres fusionnés. Lors de la phase d'extraction des objets, les objects contenus entièrement ou partiellement à l'intérieur de la parcelle sont sélectionnés (fonction "Sélection par localisation" dans QGIS). Cette sélection est ensuite vérifiée manuellement afin d'ajouter ou de retirer les objets à la limite de la parcelle qui doivent être ou non dans la sélection. Puis les statistiques sont extraites comme pour les arbres de calibration (fonction "Statistiques de zone" dans QGIS). 
 
-Ensuite, on utilise les modèles drone développés à l'échelle de l'arbre pour estimer la biomasse par arbre. On utilise deux modèles les plus performant pour estimer la biomasse totale : 
+Ensuite, on utilise les modèles drone développés à l'échelle de l'arbre pour estimer la biomasse par arbre. On utilise les modèles les plus performant pour estimer les 3 variables : 
 
-- le modèle 4 utilisant le volume projeté X_volume_area (calculé comme H_drone*DSM_area). Pour ce modèle, l'ordonnée à l'origine étant négative, on garde uniquement les valeurs prédites positives
-- le modèle 8 utilisant le logarithme du volume VS_drone  --> *option finalement abandonnée car le modèle ne vérifie pas la normalité des résidus*
-- le meilleur modèle spécifique à chaque traitement (Tables 6 à 11)
+- volume : log(X_volume_area), soit le modèle 9
+- biomasse tronc : log(X_volume_area), soit le modèle 9
+- biomasse totale : log(X_volume_area), soit le modèle 9
 
-La biomasse totale est ensuite mesurée pour la parcelle. L'erreur de l'estimation est mesurée de la manière suivante : |valeur réelle - valeur prédite| x 100
+Les variables sont ensuite extrapolées à l'échelle de la parcelle en faisant la somme de tous les arbres. L'erreur de l'estimation est mesurée de la manière suivante : |valeur réelle - valeur prédite| x 100
 
-On compare ces données avec les données de biomasse et volume (cubage) obtenus à partir des modèles globaux (voir document rellation_allométrique)
+
+
+On compare ces données avec les données *biomasse_plot_allo_globale* de biomasse et volume (cubage) obtenus à partir des modèles globaux (voir script rellation_allométrique)
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 # Estimation biomasse des objets des parcelles
-# utilisation des données parcelles extrapolées à partir des modèles globaux (voir)
-biomass =  read.csv2("biomasse_plot_allo_globale.csv",sep = ";")
-biomass.gt = biomass %>% filter(str_detect(plot_code,'PV')) %>% mutate(parcelle = paste(sub("_.*","",plot_code),"_",ferti,sep ="")) %>% select(-X,-num_plot,-bloc_stat2)
+# utilisation des données parcelles extrapolées à partir des modèles globaux (voir script relation_allometrique)
+biomass =  read.csv2("data_output/biomasse_plot_allo_globale.csv",sep = ";")
+biomass.gt = biomass %>% filter(str_detect(plot_code,'PV')) 
 
-# on resume la parcelle 21 en sommant les deux traitements NF et F (vol 2)
-biomass.21 = biomass.gt %>% filter(year == "2021") %>% mutate(ferti = "PV",treat = "2PV")
-biomass.21 = biomass.21 %>% group_by(plot_code,year, age,ferti,treat,) %>% summarise(n_alltree = sum(n_alltree),
-                                      tree_inventory = sum(tree_inventory),
-                                      area_ha = sum(area_ha),
-                                      biomass_tot_kg = sum(biomass_tot_kg),
-                                      biomass_tha = sum(biomass_tha),
-                                      volume_tot = sum(volume_tot),
-                                      volume_ha = sum(volume_ha)) %>% mutate(,parcelle = "21_PV")
+# retait parcelle 2 ans 
+biomass.gt = biomass.gt %>% filter(!year == "2021") 
 
-biomass.gt = rbind(biomass.gt,biomass.21)
+# 1.74 = pixel resolution
+data.uav.plot =  read.csv("data/data_uav_all_tree_plot_20260305.csv")
+data.uav.plot = data.uav.plot %>% mutate(DSM_area = X_count*1.74^2,
+                                         DSM_volume = X_sum*1.74^2,
+                                         X_volume_area = DSM_area*X_max)
 
+# pour le s3 variables on utilise le modele le plus performant
+data.uav.plot$volume_uav_mod = exp(predict(lm.vol.9,data.uav.plot)+0.5*summary(lm.vol.9)$sigma^2)
+data.uav.plot$biomass_trunk_uav_mod = exp(predict(lm.t.9,data.uav.plot)+0.5*summary(lm.t.9)$sigma^2)
+data.uav.plot$biomass_tot_uav_mod = exp(predict(lm.tot.9,data.uav.plot)+0.5*summary(lm.tot.9)$sigma^2)
 
-f_17_F = read.csv("parcelle_17_PV_F_arbre_stat_sig.csv",sep = ",")
-f_17_NF = read.csv("parcelle_17_PV_NF_arbre_stat_sig.csv",sep = ",")
-f_18_F = read.csv("parcelle_18_PV_F_arbre_stat_sig.csv",sep = ",")
-f_18_NF = read.csv("parcelle_18_PV_NF_arbre_stat_sig.csv",sep = ",")
-f_19_F = read.csv("parcelle_19_PV_F_arbre_stat_sig.csv",sep = ",")
-#f_19_NF = read.csv("parcelle_19_PV_NF_arbre_stat_sig.csv",sep = ",")
-#f_19_NF_L = read.csv("parcelle_19_PV_NF_arbre_large_stat_sig.csv",sep = ",")
-f_19_NF_V2 = read.csv("parcelle_19_PV_NF_arbre_stat_V2_sig.csv",sep = ",")
-f_21 = read.csv("parcelle_21_arbre_stat_sig.csv",sep = ",")
+# on resume les donnees a l'echelle de la parcelle (somme des valeurs positive pour ne pas inclure les predictions <0)
+data.uav.plot = data.uav.plot %>% group_by(treat) %>%
+  mutate(volume_uav_mod_plot = sum(volume_uav_mod),
+         biomass_trunk_uav_mod_plot = sum(biomass_trunk_uav_mod), 
+         biomass_tot_uav_mod_plot = sum(biomass_tot_uav_mod))
 
-f_17_F = f_17_F %>% mutate(parcelle = "17_F",
-                           DSM_area = X_count*1.74^2,
-                           DSM_volume = X_sum*1.74^2,
-                           X_volume_area = DSM_area*X_max)
-f_17_NF = f_17_NF %>% mutate(parcelle = "17_NF",
-                             DSM_area = X_count*1.74^2,
-                             DSM_volume = X_sum*1.74^2,
-                             X_volume_area = DSM_area*X_max)
-f_18_F = f_18_F %>% mutate(parcelle = "18_F",
-                           DSM_area = X_count*1.74^2,
-                           DSM_volume = X_sum*1.74^2,
-                           X_volume_area = DSM_area*X_max)
-f_18_NF = f_18_NF %>% mutate(parcelle = "18_NF",
-                             DSM_area = X_count*1.74^2,
-                             DSM_volume = X_sum*1.74^2,
-                             X_volume_area = DSM_area*X_max)
-f_19_F = f_19_F %>% mutate(parcelle = "19_F",
-                           DSM_area = X_count*1.74^2,
-                           DSM_volume = X_sum*1.74^2,
-                           X_volume_area = DSM_area*X_max)
-f_19_NF_V2 = f_19_NF_V2 %>% mutate(parcelle = "19_NF",
-                                   DSM_area = X_count*1.74^2,
-                                   DSM_volume = X_sum*1.74^2,
-                                   X_volume_area = DSM_area*X_max)
-f_21 = f_21 %>% mutate(parcelle = "21_PV",
-                                   DSM_area = X_count*9^2,
-                                   DSM_volume = X_sum*9^2,
-                                   X_volume_area = DSM_area*X_max)
-
-f_17_F$biomass_pred_mod4 = predict(lm.tot.4,f_17_F)
-f_17_NF$biomass_pred_mod4 = predict(lm.tot.4,f_17_NF)
-f_18_F$biomass_pred_mod4 = predict(lm.tot.4,f_18_F)
-f_18_NF$biomass_pred_mod4 = predict(lm.tot.4,f_18_NF)
-f_19_F$biomass_pred_mod4 = predict(lm.tot.4,f_19_F)
-#f_19_NF$biomass_pred_mod4 = predict(lm.tot.4,f_19_NF)
-#f_19_NF_L$biomass_pred_mod4 = predict(lm.tot.4,f_19_NF_L)
-f_19_NF_V2$biomass_pred_mod4 = predict(lm.tot.4,f_19_NF_V2)
-f_21$biomass_pred_mod4 = predict(lm.tot.4,f_21)
-
-
-f_17_F$biomass_pred_mod9 = exp(predict(lm.tot.9,f_17_F)+mean(lm.tot.9$residuals^2)/2)
-f_17_NF$biomass_pred_mod9 = exp(predict(lm.tot.9,f_17_NF)+mean(lm.tot.9$residuals^2)/2)
-f_18_F$biomass_pred_mod9 = exp(predict(lm.tot.9,f_18_F)+mean(lm.tot.9$residuals^2)/2)
-f_18_NF$biomass_pred_mod9 = exp(predict(lm.tot.9,f_18_NF)+mean(lm.tot.9$residuals^2)/2)
-f_19_F$biomass_pred_mod9 = exp(predict(lm.tot.9,f_19_F)+mean(lm.tot.9$residuals^2)/2)
-#f_19_NF$biomass_pred_mod9 = exp(predict(lm.tot.89f_19_NF)+mean(lm.tot.9$residuals^2)/2)
-#f_19_NF_L$biomass_pred_mod9 = exp(predict(lm.tot.9,f_19_NF_L)+mean(lm.tot.9$residuals^2)/2)
-f_19_NF_V2$biomass_pred_mod9 = exp(predict(lm.tot.9,f_19_NF_V2)+mean(lm.tot.9$residuals^2)/2)
-f_21$biomass_pred_mod9 = exp(predict(lm.tot.9,f_21)+mean(lm.tot.9$residuals^2)/2)
+biomass.gt = biomass.gt %>% left_join(data.uav.plot %>% group_by(treat)%>% 
+  select(treat,
+         volume_uav_mod_plot,
+         biomass_trunk_uav_mod_plot,
+         biomass_tot_uav_mod_plot) %>% 
+  unique())
+  
 
 # On utilise le meilleur modele spécifique à chq traitement
 
-# age 6
-#f_17_F$biomass_pred_modtt = predict(lm.6F.3,f_17_F)
-#f_17_NF$biomass_pred_modtt = predict(lm.6NF.2,f_17_NF)
-
-# age 5
-#f_18_F$biomass_pred_modtt = predict(lm.5F.4,f_18_F)
-#f_18_NF$biomass_pred_modtt = exp(predict(lm.5NF.5,f_18_NF)+mean(lm.5NF.5$residuals^2)/2)
-
-# age 4
-#f_19_F$biomass_pred_modtt = predict(lm.4F.3,f_19_F)
-#f_19_NF_V2$biomass_pred_modtt = exp(predict(lm.4NF.5,f_19_NF_V2)+mean(lm.4NF.5$residuals^2)/2)
-
-
-biomass.gt[biomass.gt$parcelle =="17_F","mod4_estim"] = sum(f_17_F$biomass_pred_mod4[f_17_F$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="17_NF","mod4_estim"] = sum(f_17_NF$biomass_pred_mod4[f_17_NF$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="18_F","mod4_estim"] = sum(f_18_F$biomass_pred_mod4[f_18_F$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="18_NF","mod4_estim"] = sum(f_18_NF$biomass_pred_mod4[f_18_NF$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="19_F","mod4_estim"] = sum(f_19_F$biomass_pred_mod4[f_19_F$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="19_NF","mod4_estim"] = 
-sum(f_19_NF_V2$biomass_pred_mod4[f_19_NF_V2$biomass_pred_mod4>0])
-biomass.gt[biomass.gt$parcelle =="21_PV","mod4_estim"] = 
-sum(f_21$biomass_pred_mod4[f_21$biomass_pred_mod4>0])
-
-biomass.gt = biomass.gt %>% mutate(mod4_err = abs(biomass_tot_kg-mod4_estim)/biomass_tot_kg*100)
-
-biomass.gt[biomass.gt$parcelle =="17_F","mod9_estim"] = sum(f_17_F$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="17_NF","mod9_estim"] = sum(f_17_NF$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="18_F","mod9_estim"] = sum(f_18_F$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="18_NF","mod9_estim"] = sum(f_18_NF$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="19_F","mod9_estim"] = sum(f_19_F$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="19_NF","mod9_estim"] = sum(f_19_NF_V2$biomass_pred_mod9)
-biomass.gt[biomass.gt$parcelle =="21_PV","mod9_estim"] = sum(f_21$biomass_pred_mod9)
-
-biomass.gt = biomass.gt %>% mutate(mod9_err = abs(biomass_tot_kg-mod9_estim)/biomass_tot_kg*100)
-
-biomass.gt[biomass.gt$parcelle =="17_F","mod_specific"] = sum(f_17_F$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="17_NF","mod_specific"] = sum(f_17_NF$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="18_F","mod_specific"] = sum(f_18_F$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="18_NF","mod_specific"] = sum(f_18_NF$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="19_F","mod_specific"] = sum(f_19_F$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="19_NF","mod_specific"] = sum(f_19_NF_V2$biomass_pred_modtt)
-biomass.gt[biomass.gt$parcelle =="21_PV","mod_specific"] = sum(f_21$biomass_pred_modtt)
-
-biomass.gt = biomass.gt %>% mutate(mod_specific_err = abs(biomass_tot_kg-mod_specific)/biomass_tot_kg*100)
+biomass.gt = biomass.gt %>% 
+  mutate(volume_uav_err = abs(volume_tot-volume_uav_mod_plot)/volume_tot*100,
+         biomass_trunk_uav_err = abs(biomass_trunk_plot-biomass_trunk_uav_mod_plot)/biomass_trunk_plot*100,
+         biomass_tot_uav_err = abs(biomass_tot_plot-biomass_tot_uav_mod_plot)/biomass_tot_plot*100)
 
 kable(biomass.gt,caption = table.caption("Performances des modèles pour l'estimation des biomasses totales à l'échelle des parcelles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
@@ -1490,142 +1395,327 @@ kable(biomass.gt,caption = table.caption("Performances des modèles pour l'estim
 
 Les erreurs moyennes obtenues pour chaque type de modèle sont de :
 
-- Modèle 4 : `r round(mean(biomass.gt$mod4_err))`%
-- Modèle 9 : `r round(mean(biomass.gt$mod9_err))`%
-- Modèle spécifique : `r round(mean(biomass.gt$mod_specific_err))`%
+- Modèle uav volume : `r round(mean(biomass.gt$volume_uav_err))`%
+- Modèle uav biomasse tronc : `r round(mean(biomass.gt$biomass_trunk_uav_err))`%
+- Modèle uav biomasse totale : `r round(mean(biomass.gt$biomass_tot_uav_err))`%
 
-La Parcelle 19_NF (traitement 4 x NF) est particulièrement mal estimée, ceci s'explique par la présence importante d'herbes hautes sur une large partie de la parcelle (herbes qui sont à la même hauteur que les arbres), empêchant la bonne estimation du modèle 3D avec le drone. 
-Sans cette parcelle, les modèles drones obtiennent les scores moyens suivants : 
 
-- Modèle 4 : `r round(mean(biomass.gt[!biomass.gt$treat == "4NF",]$mod4_err))`%
-- Modèle 8 : `r round(mean(biomass.gt[!biomass.gt$treat == "4NF",]$mod8_err))`%
-- Modèle spécifique : `r round(mean(biomass.gt[!biomass.gt$treat == "4NF",]$mod_specific_err))`%
-
-Les biomasses sont ensuite estimées par hectare (Table 13)
+Les biomasses sont ensuite estimées par hectare :
 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-biomass.gt = biomass.gt %>% mutate(mod4_estim_ha = mod4_estim/(area_ha*1000),
-                                   mod9_estim_ha = mod9_estim/(area_ha*1000),
-                                   mod_specific_ha = mod_specific/(area_ha*1000))
+biomass.gt = biomass.gt %>% mutate(volume_uav_mod_ha = volume_uav_mod_plot/(area_ha),
+                                   biomass_trunk_uav_mod_ha = biomass_trunk_uav_mod_plot / (area_ha*1000),
+                                   biomass_tot_uav_mod_ha = biomass_tot_uav_mod_plot/(area_ha*1000))
 
-kable(biomass.gt %>% select(parcelle,treat,area_ha,biomass_ha,mod4_estim_ha,mod9_estim_ha,mod_specific_ha),caption = table.caption("Performances des modèles pour l'estimation des biomasses totales à l'échelle des parcelles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+kable(biomass.gt %>% select(treat,area_ha,volume_uav_mod_ha,biomass_trunk_uav_mod_ha,biomass_tot_uav_mod_ha),caption = table.caption("Performances des modèles pour l'estimation des biomasses totales à l'échelle des parcelles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
-# write.csv2(biomass.gt,"estimation_parcelle_modele.csv")
 ```
 
 ## Extrapolation par les relation allométrique
 
+On utilise les modèles allométriques (forme log) calibrées sur les biomasses destructives, à partir des prédicteurs suivants : 
+- volume : CBH2 x H
+- biomasse tronc : CBH2 x H
+- biomasse totale : CBH
 
-```{r echo=FALSE}
+On estime CBH et H à partir des modèles drones 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 # On recalibre le modèle
-all_biomass <- read_excel("./biom_inventaire_regression.xlsx", 
-                          sheet = "all_biomass")
+all_biomass <- read.csv("./data/data_biomass_destructive_20260305.csv")
 all_biomass = all_biomass %>% mutate(dry_biom_tot_kg = dry_allF_tot_kg+dry_Brviv_tot_kg+dry_tronc_tot_kg,
                                      CBHH2 = CBH_m*(HTOT_m)^2,
                                      classe = as.character(classe)) 
+all_biomass_wo = all_biomass %>% filter(drone_flight == "yes")
 
-lm.tot.biom.7 <- lm(log(dry_biom_tot_kg)~log(CBH_m), data=all_biomass)
+# model volume
+lm.cub.out.9 <- lm(log(VSMALIAN_av_ec_m3)~log(CBH2H), data=all_biomass_wo)
+lm.t.biom.out.9 <- lm(log(dry_tronc_tot_kg)~log(CBH2H), data=all_biomass_wo)
+lm.tot.biom.out.7 <- lm(log(dry_biom_tot_kg)~log(CBH_m), data=all_biomass_wo)
 
 # modele drone du CBH
+data.uav.plot$HTOT_uav = predict(lm_h,data.uav.plot)
+data.uav.plot$CBH_uav = predict(lm_cbh,data.uav.plot)
+data.uav.plot = data.uav.plot %>% mutate(CBH2H_uav = CBH_uav^2*HTOT_uav)
 
-lm_cbh = lm(CBH_m~X_max,data_drone)
-summary(lm_cbh)
-anova(lm_cbh)
-hist(lm_cbh$residuals)
-ggqqplot(residuals(lm_cbh))
-plot(simulateResiduals(lm_cbh))
+data.uav.plot$volume_uav_allo = exp(predict(lm.cub.out.9,newdata = data.uav.plot %>% rename(CBH2H = CBH2H_uav))+0.5*summary(lm.cub.out.9)$sigma^2)
 
-f_17_F$CBH_pred_drone = predict(lm_cbh,f_17_F)
-f_17_NF$CBH_pred_drone = predict(lm_cbh,f_17_NF)
-f_18_F$CBH_pred_drone = predict(lm_cbh,f_18_F)
-f_18_NF$CBH_pred_drone = predict(lm_cbh,f_18_NF)
-f_19_F$CBH_pred_drone = predict(lm_cbh,f_19_F)
-f_19_NF_V2$CBH_pred_drone = predict(lm_cbh,f_19_NF_V2)
+data.uav.plot$biomass_trunk_uav_allo = exp(predict(lm.t.biom.out.9,newdata = data.uav.plot %>% rename(CBH2H = CBH2H_uav))+0.5*summary(lm.t.biom.out.9)$sigma^2)
 
-f_17_F$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_17_F %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
-f_17_NF$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_17_NF %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
-f_18_F$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_18_F %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
-f_18_NF$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_18_NF %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
-f_19_F$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_19_F %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
-f_19_NF_V2$biomass_pred_allo = exp(predict(lm.tot.biom.7,newdata = f_19_NF_V2 %>% rename(CBH_m = CBH_pred_drone))+mean(lm.tot.biom.7$residuals^2)/2)
+data.uav.plot$biomass_tot_uav_allo = exp(predict(lm.tot.biom.out.7,newdata = data.uav.plot %>% rename(CBH_m = CBH_uav))+0.5*summary(lm.tot.biom.out.7)$sigma^2)
+
+data.uav.plot = data.uav.plot %>% group_by(treat) %>%
+  mutate(volume_uav_allo_plot = sum(volume_uav_allo),
+         biomass_trunk_uav_allo_plot = sum(biomass_trunk_uav_allo), 
+         biomass_tot_uav_allo_plot = sum(biomass_tot_uav_allo))
 
 
-biomass.gt[biomass.gt$parcelle =="17_F","mod_allo_drone"] = sum(f_17_F$biomass_pred_allo)
-biomass.gt[biomass.gt$parcelle =="17_NF","mod_allo_drone"] = sum(f_17_NF$biomass_pred_allo)
-biomass.gt[biomass.gt$parcelle =="18_F","mod_allo_drone"] = sum(f_18_F$biomass_pred_allo)
-biomass.gt[biomass.gt$parcelle =="18_NF","mod_allo_drone"] = sum(f_18_NF$biomass_pred_allo)
-biomass.gt[biomass.gt$parcelle =="19_F","mod_allo_drone"] = sum(f_19_F$biomass_pred_allo)
-biomass.gt[biomass.gt$parcelle =="19_NF","mod_allo_drone"] = sum(f_19_NF_V2$biomass_pred_allo)
+biomass.gt = biomass.gt %>% left_join(data.uav.plot %>% group_by(treat)%>% 
+  select(treat,
+         volume_uav_allo_plot,
+         biomass_trunk_uav_allo_plot,
+         biomass_tot_uav_allo_plot) %>% 
+  unique())
 
-biomass.gt = biomass.gt %>% mutate(mod_allo_drone_err = abs(biomass_tot_kg-mod_allo_drone)/biomass_tot_kg*100,
-                                   mod_allo_drone_ha = mod_allo_drone/(area_ha*1000))
-
-
+biomass.gt = biomass.gt %>% 
+  mutate(volume_uav_allo_err = abs(volume_tot-volume_uav_allo_plot)/volume_tot*100,
+         biomass_trunk_uav_allo_err = abs(biomass_trunk_plot-biomass_trunk_uav_allo_plot)/biomass_trunk_plot*100,
+         biomass_tot_uav_allo_err = abs(biomass_tot_plot-biomass_tot_uav_allo_plot)/biomass_tot_plot*100)
 
 kable(biomass.gt ,caption = table.caption("Performances des modèles pour l'estimation des biomasses totales à l'échelle des parcelles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
-write.csv2(biomass.gt,"estimation_parcelle_modele.csv")
 
 ```
     
 
-On utilise le modèles allométrique d'estimation de la biomasse le plus efficace, c'est à dire celui utilisant le log du CBH (cf document Rmd "relation_allométrique") : log(biomasse totale) = `r round(lm.tot.biom.7$coefficients[1],2)`+`r round(lm.tot.biom.7$coefficients[2],2)`*log(CBH)
+Les erreurs moyennes obtenues pour chaque type de modèle sont de :
 
-Le CBH est estimé par l'intérmédiaire du modèle drone donnant le CBH en fonction de la hauteur drone : CBH = `r round(lm_cbh$coefficients[1],2)`+`r round(lm_cbh$coefficients[2],2)`*log(H_drone)
+- Modèle uav volume : `r round(mean(biomass.gt$volume_uav_allo_err))`%
+- Modèle uav biomasse tronc : `r round(mean(biomass.gt$biomass_trunk_uav_allo_err))`%
+- Modèle uav biomasse totale : `r round(mean(biomass.gt$biomass_tot_uav_allo_err))`%
 
 
+Les biomasses sont ensuite estimées par hectare :
 
-
-## Extrapolation d'ensemble
-
-Pour cette approche, le masque polygone de chaque parcelle est utilisé pour extraire l'ensemble des données CHM (sans passer par les polygones individuels de chaque arbres). Ainsi on ne passe pas par une estimation individuelle de la biomasse de chaque objet mais une estimation d'ensemble. 
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
-V1 = read.csv("parcelle_V1_stat.csv",sep = ",")
-V1 = V1 %>% select(-area)
-V1 = V1 %>% dplyr::filter(!code == "19_PV_NF")
-V3 = read.csv("parcelle_V3_stat.csv",sep = ",")
-p19NF = read.csv("parcelle_19_NF_stat.csv",sep = ",")
-p19NF$vol_drone = "V1_19NF"
+biomass.gt = biomass.gt %>% mutate(volume_uav_allo_ha = volume_uav_allo_plot/(area_ha),
+                                   biomass_trunk_uav_allo_ha = biomass_trunk_uav_allo_plot / (area_ha*1000),
+                                   biomass_tot_uav_allo_ha = biomass_tot_uav_allo_plot/(area_ha*1000))
 
-parcelle = rbind(V1,V3,p19NF)
-parcelle = parcelle %>% mutate(DSM_area = X_count*1.74^2,
-                                   DSM_area = X_sum*1.74^2,
-                                   X_volume_area = DSM_area*X_max)
-
-parcelle$parcelle = c("17_F","17_NF","19_F","18_F","18_NF","19_NF")
-
-#on utilise les mêmes modèles
-lm.tot.4 <- lm(dry_biom_tot_kg ~ X_volume_area, data=data_drone_wo)
-lm.tot.8 <- lm(log(dry_biom_tot_kg)~log(X_volume_area), data=data_drone_wo)
-
-parcelle$biomass_parcel_mod4 = predict(lm.tot.4,parcelle)
-parcelle$biomass_parcel_mod8 = exp(predict(lm.tot.8,parcelle)+mean(lm.tot.8$residuals^2)/2)
-
-parcelle = parcelle %>% select(parcelle,biomass_parcel_mod4,biomass_parcel_mod8)
-
-biomass.gt = biomass.gt %>% left_join(parcelle)
-biomass.gt = biomass.gt %>% mutate(biomass_parcel_mod4_err = abs(biomass_tot-biomass_parcel_mod4)/biomass_tot*100,
-                                  biomass_parcel_mod8_err = abs(biomass_tot-biomass_parcel_mod8)/biomass_tot*100)
-
-
-biomass.gt %>% select(parcelle,treat,area_ha,biomass_tot,biomass_parcel_mod4,biomass_parcel_mod4_err,
-                      biomass_parcel_mod8,biomass_parcel_mod8_err) %>% 
-  kable(caption = table.caption("Performances des modèles pour l'estimation des biomasses totales (approche d'ensemble)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+kable(biomass.gt %>% select(treat,area_ha,volume_uav_allo_ha,biomass_trunk_uav_allo_ha,biomass_tot_uav_allo_ha),caption = table.caption("Performances des modèles pour l'estimation des biomasses totales à l'échelle des parcelles"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 
 ```
 
-Cette approche donne des résultats beaucoup moins intéressant que l'approche par arbre (% d'erreur trop élevé)
+
+## Evaluation des performances
+
+On évalue le bias, bias relatif (%), MAE, RMSE et le CV% (à partir de l'écart type de l'erreur absolue) des méthodes drones vs l'évaluation par les relations allométriques.
+On calculé également le R2 et la pente de regression entre estimation modèle drone et valeure observée (ie estimée par les modèles allo)
+
+UAV_mod = méthode drone estimant le volume et biomasse à partir de modèles directement calibré sur les biomasses destructives
+UAV_allo = méthode drone estimant le volume et biomasse à partir de l'estimation drone du CBH et H et des modèles allométriques
+
+On utilise les estimations rapportée à l'hectare pour éviter d'avoir des estimations RMSE, MAE et Biais trop élevées
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+modele_uav_perf_plot = data.frame(uav_method = c("uav_mod","uav_allo"),
+                                  volume_bias=0,volume_bias_perc=0, 
+                                  volume_mae=0,volume_rmse=0,
+                                  volume_errabs=0,volume_cv=0,
+                                  volume_r2=0,volume_slope=0,
+                                  biomass_trunk_bias=0,biomass_trunk_bias_perc=0, 
+                                  biomass_trunk_mae=0,biomass_trunk_rmse=0,
+                                  biomass_trunk_errabs=0,biomass_trunk_cv=0,
+                                  biomass_trunk_r2=0,biomass_trunk_slope=0,
+                                  biomass_tot_bias=0,biomass_tot_bias_perc=0, 
+                                  biomass_tot_mae=0,biomass_tot_rmse=0,
+                                  biomass_tot_errabs=0,biomass_tot_cv=0,
+                                  biomass_tot_r2=0,biomass_tot_slope=0)
+```
+
+Performance des deux méthodes pour l'estimation du volume 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# performance pour la variable volume
+## bias absolu et relatif
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_bias =
+  round(mean(biomass.gt$volume_uav_mod_ha - biomass.gt$volume_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_bias =
+  round(mean(biomass.gt$volume_uav_allo_ha - biomass.gt$volume_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_bias_perc =
+  round(mean((biomass.gt$volume_uav_mod_ha - biomass.gt$volume_ha) / biomass.gt$volume_ha)*100,2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_bias_perc =
+  round(mean((biomass.gt$volume_uav_allo_ha - biomass.gt$volume_ha) / biomass.gt$volume_ha)*100,2)
+
+## MAE et RMSE
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_mae = 
+  round(mae(biomass.gt$volume_ha, biomass.gt$volume_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_mae = 
+  round(mae(biomass.gt$volume_ha, biomass.gt$volume_uav_allo_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_rmse = 
+  round(rmse(biomass.gt$volume_ha, biomass.gt$volume_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_rmse = 
+  round(rmse(biomass.gt$volume_ha, biomass.gt$volume_uav_allo_ha),2)
+
+## CV (a partir de l'ecart type de l'erreur absolue)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_errabs = 
+  sd(abs(biomass.gt$volume_uav_mod_ha - biomass.gt$volume_ha))*100
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_errabs = 
+  sd(abs(biomass.gt$volume_uav_allo_ha - biomass.gt$volume_ha))*100
+
+modele_uav_perf_plot = modele_uav_perf_plot %>% mutate(volume_cv = round(volume_errabs / volume_mae,2))
+
+## R2 et pente
+lm_vol_mod = lm(volume_ha ~ volume_uav_mod_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_r2 = 
+  round(summary(lm_vol_mod)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$volume_slope = 
+  round(coef(lm_vol_mod)[2],2)
+
+lm_vol_allo = lm(volume_ha ~ volume_uav_allo_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_r2 = 
+  round(summary(lm_vol_allo)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$volume_slope = 
+  round(coef(lm_vol_allo)[2],2)
+
+kable(modele_uav_perf_plot %>% select(uav_method, volume_bias,volume_bias_perc, 
+                                  volume_mae,volume_rmse,
+                                  volume_errabs,volume_cv,
+                                  volume_r2,volume_slope),caption = table.caption("Performances des méthodes drone pour l'estimation du volume des parcelles (en m3)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+
+```
+
+Performances pour la biomasse des troncs
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# performance pour la variable biomasse tronc
+## bias absolu et relatif
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_bias =
+  round(mean(biomass.gt$biomass_trunk_uav_mod_ha - biomass.gt$biomass_trunk_tha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_bias =
+  round(mean(biomass.gt$biomass_trunk_uav_allo_ha - biomass.gt$biomass_trunk_tha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_bias_perc =
+  round(mean((biomass.gt$biomass_trunk_uav_mod_ha - biomass.gt$biomass_trunk_tha) / biomass.gt$biomass_trunk_tha)*100,2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_bias_perc =
+  round(mean((biomass.gt$biomass_trunk_uav_allo_ha - biomass.gt$biomass_trunk_tha) / biomass.gt$biomass_trunk_tha)*100,2)
+
+## MAE et RMSE
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_mae = 
+  round(mae(biomass.gt$biomass_trunk_tha, biomass.gt$biomass_trunk_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_mae = 
+  round(mae(biomass.gt$biomass_trunk_tha, biomass.gt$biomass_trunk_uav_allo_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_rmse = 
+  round(rmse(biomass.gt$biomass_trunk_tha, biomass.gt$biomass_trunk_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_rmse = 
+  round(rmse(biomass.gt$biomass_trunk_tha, biomass.gt$biomass_trunk_uav_allo_ha),2)
+
+## CV (a partir de l'ecart type de l'erreur absolue)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_errabs = 
+  sd(abs(biomass.gt$biomass_trunk_uav_mod_ha - biomass.gt$biomass_trunk_tha))*100
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_errabs = 
+  sd(abs(biomass.gt$biomass_trunk_uav_allo_ha - biomass.gt$biomass_trunk_tha))*100
+
+modele_uav_perf_plot = modele_uav_perf_plot %>% mutate(biomass_trunk_cv = round(biomass_trunk_errabs / biomass_trunk_mae,2))
+
+## R2 et pente
+lm_biom_trunk_mod = lm(biomass_trunk_tha ~ biomass_trunk_uav_mod_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_r2 = 
+  round(summary(lm_biom_trunk_mod)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_trunk_slope = 
+  round(coef(lm_biom_trunk_mod)[2],2)
+
+lm_biom_trunk_allo = lm(biomass_trunk_tha ~ biomass_trunk_uav_allo_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_r2 = 
+  round(summary(lm_biom_trunk_allo)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_trunk_slope = 
+  round(coef(lm_biom_trunk_allo)[2],2)
+
+kable(modele_uav_perf_plot %>% select(uav_method, biomass_trunk_bias,biomass_trunk_bias_perc, 
+                                  biomass_trunk_mae,biomass_trunk_rmse,
+                                  biomass_trunk_errabs,biomass_trunk_cv,
+                                  biomass_trunk_r2,biomass_trunk_slope),caption = table.caption("Performances des méthodes drone pour l'estimation de la biomasse tronc des parcelles (en m3)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```
 
 
-# Vérification 
+Performances pour la biomasse totale
 
-- Utilisation du même facteur correctif entre les modèles drones et Iaviantsoa ? 
-- Mesure de la biomasse totale des parcelles fournies par Iaviantsoa : mesure réelle sur tous les arbres ou bien à partir des modèles biomasse ? Si modèle, quelle est la donnée d'entrée (diamètre tronc, hauteur, etc.) ?  
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# performance pour la variable biomasse tronc
+## bias absolu et relatif
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_bias =
+  round(mean(biomass.gt$biomass_tot_uav_mod_ha - biomass.gt$biomass_tot_tha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_bias =
+  round(mean(biomass.gt$biomass_tot_uav_allo_ha - biomass.gt$biomass_tot_tha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_bias_perc =
+  round(mean((biomass.gt$biomass_tot_uav_mod_ha - biomass.gt$biomass_tot_tha) / biomass.gt$biomass_tot_tha)*100,2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_bias_perc =
+  round(mean((biomass.gt$biomass_tot_uav_allo_ha - biomass.gt$biomass_tot_tha) / biomass.gt$biomass_tot_tha)*100,2)
+
+## MAE et RMSE
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_mae = 
+  round(mae(biomass.gt$biomass_tot_tha, biomass.gt$biomass_tot_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_mae = 
+  round(mae(biomass.gt$biomass_tot_tha, biomass.gt$biomass_tot_uav_allo_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_rmse = 
+  round(rmse(biomass.gt$biomass_tot_tha, biomass.gt$biomass_tot_uav_mod_ha),2)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_rmse = 
+  round(rmse(biomass.gt$biomass_tot_tha, biomass.gt$biomass_tot_uav_allo_ha),2)
+
+## CV (a partir de l'ecart type de l'erreur absolue)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_errabs = 
+  sd(abs(biomass.gt$biomass_tot_uav_mod_ha - biomass.gt$biomass_tot_tha))*100
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_errabs = 
+  sd(abs(biomass.gt$biomass_tot_uav_allo_ha - biomass.gt$biomass_tot_tha))*100
+
+modele_uav_perf_plot = modele_uav_perf_plot %>% mutate(biomass_tot_cv = round(biomass_tot_errabs / biomass_tot_mae,2))
+
+## R2 et pente
+lm_biom_tot_mod = lm(biomass_tot_tha ~ biomass_tot_uav_mod_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_r2 = 
+  round(summary(lm_biom_tot_mod)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_mod",]$biomass_tot_slope = 
+  round(coef(lm_biom_tot_mod)[2],2)
+
+lm_biom_tot_allo = lm(biomass_tot_tha ~ biomass_tot_uav_allo_ha, biomass.gt)
+
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_r2 = 
+  round(summary(lm_biom_tot_allo)$adj.r.squared,2)
+modele_uav_perf_plot[modele_uav_perf_plot$uav_method == "uav_allo",]$biomass_tot_slope = 
+  round(coef(lm_biom_tot_allo)[2],2)
+
+kable(modele_uav_perf_plot %>% select(uav_method, biomass_tot_bias,biomass_tot_bias_perc, 
+                                  biomass_tot_mae,biomass_tot_rmse,
+                                  biomass_tot_errabs,biomass_tot_cv,
+                                  biomass_tot_r2,biomass_tot_slope),caption = table.caption("Performances des méthodes drone pour l'estimation de la biomasse totale des parcelles (en m3)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
+```
+
+## Sauvegarde base de donnees
+
+La base de données finale contenant les estimations de tous les modèles est sauvegardée dans le fichier "estimation_plot_modeles" (dossier data_output)
+
+La base de donnees des performances des modles est sauvegardée dans le fichier "model_uav_perf_plot"
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+write.csv2(biomass.gt,"data_output/estimation_plot_modeles.csv",row.names = FALSE)
+write.csv2(modele_uav_perf_plot,"data_output/model_uav_perf_plot.csv",row.names = FALSE)
+```
+
 
 
 

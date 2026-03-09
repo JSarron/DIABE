@@ -105,7 +105,7 @@ Cette première modélisation calibre des modèles à partir des données de bio
 
 ### **Estimation de la biomasse sèche totale des feuilles**
 
-```{r eval=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 lm.f.biom.1 <- lm(dry_allF_tot_kg ~ HTOT_m, data=all_biomass)
 lm.f.biom.2 <- lm(dry_allF_tot_kg ~ CBH_m, data=all_biomass)
@@ -249,6 +249,10 @@ bp.test.vec.b <- c()
 a.vec.b <- c()
 b.vec.b <- c()
 cf.vec.b <- c()
+
+variables <- c("HTOT", "CBH", "CBHxH", "CBH2xH", "CBHxH2",
+               "HTOT.log", "CBH.log", "CBHxH.log", "CBH2xH.log","CBHxH2.log")
+
 
 for (i in 1:nb_model){
   bias.abs.vec.b[i] <- round(mean(unlist(list.pred.branche.biom[i]) - all_biomass$dry_Brviv_tot_kg),2)
@@ -476,7 +480,7 @@ kable(df.results.tot.biom,caption = table.caption("Performances des modèles pou
 Pour le volume, les variables exprimée en m3 sont multiplées par 1000 pour eviter les trop faibles valeurs arrondies à 0. 
 Il s'agit du biais absolu, du MAE et RMSE et du paramètre a (pour les modèles log seulement)
 
-```{r eval=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 lm.cub.1 <- lm(VSMALIAN_av_ec_m3 ~ HTOT_m, data=all_biomass)
 lm.cub.2 <- lm(VSMALIAN_av_ec_m3 ~ CBH_m, data=all_biomass)
@@ -580,7 +584,7 @@ On retire également les arbres des parcelles 2 ans
 
 On calibre donc les modèles à afficher dans l'article (biomasse tronc et biomasse totale), sur 40 arbres
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 all_biomass = all_biomass %>% mutate(code = paste(age,ferti,classe,sep ="_"))
 
@@ -1126,12 +1130,12 @@ plot_grid(gres.tot.out.6,gres.tot.out.7,
 
 ```
 
-### **Estimation du volume des arbres  (SANS ARBRES MANQUANT)**
+### **Estimation du volume des arbres  (40 arbres)**
 
 Pour le volume, les variables exprimée en m3 sont multiplées par 1000 pour eviter les trop faibles valeurs arrondies à 0. 
 Il s'agit du biais absolu, du MAE et RMSE et du paramètre a (pour les modèles log seulement)
 
-```{r eval=FALSE, message=FALSE, warning=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 lm.cub.out.1 <- lm(VSMALIAN_av_ec_m3 ~ HTOT_m, data=all_biomass_wo)
 lm.cub.out.2 <- lm(VSMALIAN_av_ec_m3 ~ CBH_m, data=all_biomass_wo)
@@ -1225,7 +1229,7 @@ kable(df.results.cub.out,caption = table.caption("Performances des modèles pour
 
 Graphiques des résiduelles du modèle sur l'échelle log pour validation du modèle : (uniquement pour les modèles log, plus performants)
 
-```{r graph_res, echo=FALSE, message=FALSE, warning=FALSE}
+```{r , echo=FALSE, message=FALSE, warning=FALSE}
 
 # plot des residuelles
 gres.mod.cub.out.6 <- ggplot()+
@@ -1257,7 +1261,7 @@ plot_grid(gres.mod.cub.out.6,gres.mod.cub.out.7,
 
 Graphique des prédictions (échelle de la variable à prédire) vs résiduelle de prédiction (observée - prédite), pour illustrer les biais: 
 
-```{r graph_res, echo=FALSE, message=FALSE, warning=FALSE}
+```{r , echo=FALSE, message=FALSE, warning=FALSE}
 
 # plot des residuelles
 gres.cub.out.6 <- ggplot()+
@@ -1420,22 +1424,22 @@ g.tot <- ggplot(all_biomass,aes(log(CBH_m^2*HTOT_m),log(dry_biom_tot_kg)))+
 
 
 
-svg("graph/graph_allo_cubage.svg")
-g.volume
-dev.off() 
+#svg("graph/graph_allo_cubage.svg")
+#g.volume
+#dev.off() 
 
-svg("graph/graph_allo_biomass_tronc.svg")
-g.tronc
-dev.off()
+#svg("graph/graph_allo_biomass_tronc.svg")
+#g.tronc
+#dev.off()
 
-svg("graph/graph_allo_biomass_tot.svg")
-g.tot
-dev.off()
+#svg("graph/graph_allo_biomass_tot.svg")
+#g.tot
+#dev.off()
 
-svg("graph/graph_all_allo_model.svg")
-plot_grid(g.volume,g.tronc,g.tot,
-          labels = c("A","B","C"))
-dev.off()
+#svg("graph/graph_all_allo_model.svg")
+#plot_grid(g.volume,g.tronc,g.tot,
+ #         labels = c("A","B","C"))
+#dev.off()
 
 plot_grid(g.volume,g.tronc,g.tot,
           labels = c("A","B","C"))  
@@ -1605,14 +1609,14 @@ plot_grid(g.volume.pred,g.volume.pred.res,
           align = "hv", axis = c("b","l"))
 
 #EXPORT
-svg("graph/graph_all_allo_model_pred.svg")
-plot_grid(g.volume.pred,g.volume.pred.res,
-          g.trunk.pred,g.trunk.pred.res,
-          g.tot.pred,g.tot.pred.res,
-          labels = c("A","B","C","D","E","F"),
-          ncol = 2,nrow = 3,
-          align = "hv", axis = c("b","l"))
-dev.off()
+#svg("graph/graph_all_allo_model_pred.svg")
+#plot_grid(g.volume.pred,g.volume.pred.res,
+#         g.trunk.pred,g.trunk.pred.res,
+#          g.tot.pred,g.tot.pred.res,
+#          labels = c("A","B","C","D","E","F"),
+#          ncol = 2,nrow = 3,
+#          align = "hv", axis = c("b","l"))
+#dev.off()
 
 ```
 
@@ -1632,7 +1636,7 @@ Le script sauvegarde deux bases de données :
 biomasse_plot_allo_pertree.csv : estimation pour chaque arbre de l'inventaire 
 biomasse_plot_allo_globale.csv : estimation pour chaque arbre de l'inventaire puis aggrégée par parcelle (total et par hectare)
 
-```{r echo=FALSE}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 # donnees d'inventaire parcelle
 
