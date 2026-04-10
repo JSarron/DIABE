@@ -20,6 +20,13 @@ output:
 urlcolor: blue
 ---
 
+**AVANT DE COMMENCER** : créer un dossier "data" contenant les données brutes et un dossier "data_output" contenant les données sorties (modèles)
+
+**Fichiers données brutes** : 
+- uav_calibration_tree_data_20260305.csv
+- destructive_biomass_data_20260305.csv
+- info_plot_data_20260305.csv
+
 
 # Introduction
 
@@ -89,10 +96,10 @@ suppressPackageStartupMessages(library(lmtest))
 
 
 # importation des données biomasses destructives des 40 arbres avec coordonnees GPS + toutes les donénes (biomasse, volume)
-data_drone = read.csv("data/data_uav_calibration_tree_20260305.csv",dec = ".") 
+data_drone = read.csv("data/uav_calibration_tree_data_20260305.csv", dec = ".", sep = ";") 
 
 # importation donnees biomasse destructives
-all_biomass <- read.csv("data/data_biomass_destructive_20260305.csv")
+all_biomass <- read.csv("data/destructive_biomass_data_20260305.csv", dec = ".", sep = ";")
 
 data_drone = data_drone %>% left_join(all_biomass)
 
@@ -1357,7 +1364,7 @@ biomass.gt = biomass %>% filter(str_detect(plot_code,'PV'))
 biomass.gt = biomass.gt %>% filter(!year == "2021") 
 
 # 1.74 = pixel resolution
-data.uav.plot =  read.csv("data/data_uav_all_tree_plot_20260305.csv")
+data.uav.plot =  read.csv("data/info_plot_data_20260305.csv", dec = ".", sep = ";")
 data.uav.plot = data.uav.plot %>% mutate(DSM_area = X_count*1.74^2,
                                          DSM_volume = X_sum*1.74^2,
                                          X_volume_area = DSM_area*X_max)
@@ -1425,7 +1432,7 @@ On estime CBH et H à partir des modèles drones
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 
 # On recalibre le modèle
-all_biomass <- read.csv("./data/data_biomass_destructive_20260305.csv")
+all_biomass <- read.csv("./data/destructive_biomass_data_20260305.csv", dec = ".", sep = ";")
 all_biomass = all_biomass %>% mutate(dry_biom_tot_kg = dry_allF_tot_kg+dry_Brviv_tot_kg+dry_tronc_tot_kg,
                                      CBHH2 = CBH_m*(HTOT_m)^2,
                                      classe = as.character(classe)) 

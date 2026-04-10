@@ -23,8 +23,9 @@ urlcolor: blue
 **AVANT DE COMMENCER** : créer un dossier "data" contenant les données brutes et un dossier "data_output" contenant les données sorties (modèles)
 
 **Fichiers données brutes** : 
-- data_biomass_destructive.csv
-- data_inventaire.csv
+- destructive_biomass_data_20260305.csv
+- inventory_data_20260305.csv
+- info_plot_data_20260305.csv
 
 # Introduction
 
@@ -67,7 +68,7 @@ suppressPackageStartupMessages(library(DHARMa))
 suppressPackageStartupMessages(library(cowplot))
 suppressPackageStartupMessages(library(lmtest))
 
-all_biomass <- read.csv("./data/data_biomass_destructive_20260305.csv")
+all_biomass <- read.csv("./data/destructive_biomass_data_20260305.csv", dec = ".", sep = ";")
 
 
 # compute total Biomass and CBHH2
@@ -1640,10 +1641,10 @@ biomasse_plot_allo_globale.csv : estimation pour chaque arbre de l'inventaire pu
 
 # donnees d'inventaire parcelle
 
-inventaire <- read.csv2("data/data_inventory_20260305.csv")
+inventaire <- read.csv("data/inventory_data_20260305.csv", dec = ".", sep = ";")
 
 # on ajoute la surface
-surf.plot <- read.csv2("data/data_info_plot_20260305.csv") %>% select(plot_code,age,ferti,treat,n_alltree,area_m2,area_ha,tree_inventory)
+surf.plot <- read.csv("data/info_plot_data_20260305.csv", dec = ".", sep = ";") %>% select(plot_code,age,ferti,treat,n_alltree,area_m2,area_ha,tree_inventory)
 
 inventaire = inventaire %>% left_join(surf.plot)
 
