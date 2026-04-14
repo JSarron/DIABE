@@ -29,6 +29,6 @@ Le fichier permet de faire apparaître les sorties des modèles et les graphique
 
 **Nom du fichier** : *modelisation_drone_DIABE.Rmd*
 
-Script contenant les codes R pour établir les modèles drones pour estimer les biomasses et volumes tous traitements confondus à partir des données drones via deux méthodes : modélisation direct sur les données de biomasses destructives ou bien modélisation à partir des estimations drones de H et CBH et des relations allométriques. 
+Script contenant les codes R pour établir les modèles drones pour estimer les biomasses et volumes tous traitements confondus à partir des données drones via deux méthodes : modélisation direct sur les données de biomasses destructives ou bien modélisation à partir des estimations drones de H et CBH et des relations allométriques (voir le fichier Fig2_workflow). 
 
 Ce script est associé à la base de données (.csv) *uav_calibration_tree_data_20260305* qui contient les données drones des 40 arbres échantillonés
