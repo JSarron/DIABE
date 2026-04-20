@@ -6,7 +6,7 @@ Ce projet fait référence à l'analyse de données de biomasses d'E. robusta da
 **Collecteur des données** : Iviantsoa RAMANANDRAIBE
 **Analyse et rédaction script** : Julien SARRON (Cirad - HortSys)
 **Article associé** : 'Allometry and UAV-based estimation of tree dimensions, volume and aboveground biomass of Eucalyptus robusta plantations in the central highlands of Madagascar'
-
+**Lien vers les données** : https://doi.org/10.18167/DVN1/UQ3ZAX
 
 Le premier objectif de ce travail est de construire des relations allométriques pour les biomasses de chaque compartiement et le volume total des arbres (cubage) à partir des données de thèse de Iavantsoa Ramanandraibe (projet DIABE) et sans considérer les traitements âge et fertilisation (NF et F).
 Le second objectif consiste à évaluer les potentialités du drone pour estimer la stucture des arbres (hauteur, volume, biomasse) et la biomasse totale des parcelles. Pour ce faire les parcelles ont été suvolées par un drone permettant la production de cartes 3D. Puis les données drones sont comparées à des données de terrain (ground truth) pour calibrer des modèles. 
@@ -21,14 +21,14 @@ Script contenant les codes R pour établir les relations allométriques des arbr
 
 Les relations sont d'abord calibrées sur l'ensemble des arbres prélevés (soit 64 arbres) puis sur les arbres qui ont été repéré par drone (40 arbres)
 
-Ce script est associé à la base de données (.csv) *data_biomass_destructive* qui regroupe l'ensemble des données de biomasses et volume destructives par compartiment ainsi que l'analyse des échantillons de ces biomasses pour estimer les teneurs en eau
+Ce script est associé à la base de données (.csv) *destructive_biomass_data_20260305* qui regroupe l'ensemble des données de biomasses et volume destructives par compartiment ainsi que l'analyse des échantillons de ces biomasses pour estimer les teneurs en eau
 
 Le fichier permet de faire apparaître les sorties des modèles et les graphiques. 
 
 ## Script pour l'établissement des modèles drones 
 
-**Nom du fichier** : *relation_allométrique.Rmd*
+**Nom du fichier** : *modelisation_drone_DIABE.Rmd*
 
-Script contenant les codes R pour établir les modèles drones pour estimer les biomasses et volumes tous traitements confondus
+Script contenant les codes R pour établir les modèles drones pour estimer les biomasses et volumes tous traitements confondus à partir des données drones via deux méthodes : modélisation direct sur les données de biomasses destructives ou bien modélisation à partir des estimations drones de H et CBH et des relations allométriques (voir le fichier Fig2_workflow). 
 
-Ce script est associé à la base de données (.csv) *data_uav_calibration_tree* qui contient les données drones des 40 arbres échantillonés
+Ce script est associé à la base de données (.csv) *uav_calibration_tree_data_20260305* qui contient les données drones des 40 arbres échantillonés
