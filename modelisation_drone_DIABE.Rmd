@@ -20,7 +20,7 @@ output:
 urlcolor: blue
 ---
 
-**AVANT DE COMMENCER** : créer un dossier "data" contenant les données brutes et un dossier "data_output" contenant les données sorties (modèles)
+**AVANT DE COMMENCER** : créer un dossier "data" contenant les données brutes et un dossier "data_output" contenant les données sorties (modèles).
 
 **Fichiers données brutes** : 
 - uav_calibration_tree_data_20260305.csv

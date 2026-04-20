@@ -25,10 +25,12 @@ editor_options:
 
 **AVANT DE COMMENCER** : créer un dossier "data" contenant les données
 brutes et un dossier "data_output" contenant les données sorties
-(modèles)
+(modèles).
 
-**Fichiers données brutes** : - destructive_biomass_data_20260305.csv -
-inventory_data_20260305.csv - info_plot_data_20260305.csv
+**Fichiers données brutes** : 
+- destructive_biomass_data_20260305.csv 
+- inventory_data_20260305.csv 
+- info_plot_data_20260305.csv
 
 # Introduction
 
