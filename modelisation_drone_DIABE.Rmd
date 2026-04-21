@@ -93,7 +93,7 @@ suppressPackageStartupMessages(library(readxl))
 suppressPackageStartupMessages(library(Metrics))
 suppressPackageStartupMessages(library(DHARMa))
 suppressPackageStartupMessages(library(lmtest))
-
+suppressPackageStartupMessages(library(cowplot))
 
 # importation des données biomasses destructives des 40 arbres avec coordonnees GPS + toutes les donénes (biomasse, volume)
 data_drone = read.csv("data/uav_calibration_tree_data_20260305.csv", dec = ".", sep = ";") 
@@ -141,6 +141,11 @@ hist(lm_cbh$residuals)
 
 # lm_h_age = lm(HTOT_m~X_max + age,data_drone)
 # anova(lm_h_age)
+
+lm_h_treat = lm(HTOT_m~X_max + treat,data_drone)
+anova(lm_h_treat)
+
+
 # pas d'effet de l'age sur la relation entre les deux hauteurs
 
 ```
@@ -841,7 +846,6 @@ kable(param.vol %>% mutate(across(is.numeric, round, digits=2)),
 
 ```
  
-
 
 # Modélisation de la biomasse totale par drone pour chaque traitement
 
@@ -2043,6 +2047,94 @@ kable(modele_uav_perf_plot %>% select(uav_method, biomass_tot_bias,biomass_tot_b
                                   biomass_tot_errabs,biomass_tot_cv,
                                   biomass_tot_r2,biomass_tot_slope),caption = table.caption("Performances des méthodes drone pour l'estimation de la biomasse totale des parcelles (en m3)"))%>% kable_styling(font_size = 12, bootstrap_options = "striped", full_width = T)
 ```
+
+### Graphique comparaison estimation parcelles
+
+```{r message=FALSE, warning=FALSE}
+
+g.vol.comp.plot <- ggplot(biomass.gt)+
+  geom_point(aes(volume_uav_mod_ha,volume_ha,color = "Method 1"))+
+  geom_point(aes(volume_uav_allo_ha,volume_ha,color = "Method 2"))+
+  geom_smooth(aes(volume_uav_mod_ha,volume_ha,color = "Method 1"),method = "lm",se =F)+
+  geom_smooth(aes(volume_uav_allo_ha,volume_ha,color = "Method 2"),method = "lm",se =F)+
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black")+
+  scale_color_manual(
+    name = "UAV estimation",
+    values = c("Method 1" = "#fc8d62", "Method 2" = "#8da0cb")
+  ) +
+  theme_minimal()+ 
+  theme (axis.line = element_line(colour = "black"),
+         plot.title = element_text(size = 10),
+         #plot.subtitle = element_text(size = 20),
+         axis.title = element_text(size = 10),
+         #axis.title.x = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+         axis.text = element_text(size = 7),
+         axis.ticks.length = unit(0.25,"cm"))+
+  labs(y = expression(paste("Observed volume (",m^3," ",ha^-1,")",sep ="")),
+       x = expression(paste("Predicted volume (",m^3," ",ha^-1,")",sep ="")))
+               
+g.t.comp.plot <- ggplot(biomass.gt)+
+  geom_point(aes(biomass_trunk_uav_mod_ha,biomass_trunk_tha,color = "Method 1"))+
+  geom_point(aes(biomass_trunk_uav_allo_ha,biomass_trunk_tha,color = "Method 2"))+
+  geom_smooth(aes(biomass_trunk_uav_mod_ha,biomass_trunk_tha,color = "Method 1"),
+              method = "lm",se =F)+
+  geom_smooth(aes(biomass_trunk_uav_allo_ha,biomass_trunk_tha,color = "Method 2"),
+              method = "lm",se =F)+
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black")+
+  scale_color_manual(
+    name = "UAV estimation",
+    values = c("Method 1" = "#fc8d62", "Method 2" = "#8da0cb")
+  ) +
+  theme_minimal()+ 
+  theme (axis.line = element_line(colour = "black"),
+         plot.title = element_text(size = 10),
+         #plot.subtitle = element_text(size = 20),
+         axis.title = element_text(size = 10),
+         #axis.title.x = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+         axis.text = element_text(size = 7),
+         axis.ticks.length = unit(0.25,"cm"),
+         legend.position =  "none")+
+  labs(y = expression(paste("Observed stem AGB (Mg ",ha^-1,")",sep ="")),
+       x = expression(paste("Predicted stem AGB (Mg ",ha^-1,")",sep ="")))
+
+g.tot.comp.plot <- ggplot(biomass.gt)+
+  geom_point(aes(biomass_tot_uav_mod_ha,biomass_tot_tha,color = "Method 1"))+
+  geom_point(aes(biomass_tot_uav_allo_ha,biomass_tot_tha,color = "Method 2"))+
+  geom_smooth(aes(biomass_tot_uav_mod_ha,biomass_tot_tha,color = "Method 1"),
+              method = "lm",se =F)+
+  geom_smooth(aes(biomass_tot_uav_allo_ha,biomass_tot_tha,color = "Method 2"),
+              method = "lm",se =F)+
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "black")+
+  scale_color_manual(
+    name = "UAV estimation",
+    values = c("Method 1" = "#fc8d62", "Method 2" = "#8da0cb")
+  ) +
+  theme_minimal()+ 
+  theme (axis.line = element_line(colour = "black"),
+         plot.title = element_text(size = 10),
+         #plot.subtitle = element_text(size = 20),
+         axis.title = element_text(size = 10),
+         #axis.title.x = element_text(margin = margin(t = 0, r = 0, b = 0, l = 0)),
+         axis.text = element_text(size = 7),
+         axis.ticks.length = unit(0.25,"cm"),
+         legend.position =  "none")+
+  labs(y = expression(paste("Observed total AGB (Mg ",ha^-1,")",sep ="")),
+       x = expression(paste("Observed total AGB (Mg ",ha^-1,")",sep ="")))
+
+legend_b <- get_legend(g.vol.comp.plot)
+
+
+g.uav.comp.plot = plot_grid(g.vol.comp.plot + theme(legend.position="none"),
+                            g.t.comp.plot,
+                            g.tot.comp.plot,
+                            legend_b,
+                            labels = c("A","B","C",""),
+                            ncol = 2,nrow = 2,
+                            align = "hv", axis = c("b","l"))
+
+ggplot2::ggsave('graph/graph_uav_comp_plot.svg', g.uav.comp.plot) 
+```
+
 
 ## Sauvegarde base de donnees
 
